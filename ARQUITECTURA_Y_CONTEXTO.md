@@ -1824,3 +1824,38 @@ Primero confirmar con el usuario la exclusión de `.venv` en Git y explicar la c
 Esta versión recupera decisiones de la conversación tras una sobrescritura accidental con la versión 0.1. Se conserva el contenido técnico original como propuesta y antecedente, con avisos explícitos donde quedó sustituido. La recuperación es documental y no supone aprobación de cambios arquitectónicos ni implementación funcional.
 
 Comprobaciones de recuperación: contenido original conservado salvo actualizaciones identificadas, bloques de código equilibrados, decisiones principales presentes, exclusiones de Git verificadas y `git diff --check` sin incidencias. No hay aplicación ni comandos de tests/lint configurados que ejecutar para este cambio documental.
+
+## Anexo I. Avance guiado al 27/10/2026
+
+Este estado sustituye las descripciones anteriores que indicaban que Django aún no existía.
+
+- Nombre técnico elegido por el usuario: `rrhh-tool`. `uv init --bare` generó `pyproject.toml`; uv 0.13.5 se instaló dentro de `.venv` y se declaró como dependencia de desarrollo. `uv.lock` generado y comprobado por el usuario.
+- Dependencias instaladas: Django 5.2.18 y DRF 3.18.3. DRF todavía no está integrado en la configuración ni tiene endpoints.
+- Estructura aprobada: `src/manage.py` y `src/project/`. Posteriormente el usuario organizó los módulos funcionales en `src/backend/` y reservó `src/frontend/` para interfaz. Se confirmó `backend.employees`, con `src/backend/__init__.py`, `EmployeesConfig.name = "backend.employees"` y registro en `INSTALLED_APPS`.
+- El usuario aplicó las 18 migraciones iniciales de Django, creó un administrador local y verificó el acceso a `/admin/` y el arranque en loopback. No registrar ni reutilizar aquí sus credenciales. La base `src/db.sqlite3` es solo de desarrollo y está excluida de Git junto con sus auxiliares.
+- Método instructivo aclarado: utilizar generadores y herramientas habituales (uv, startproject, startapp), explicar sus resultados y avanzar con comandos ejecutados por el usuario. No exigir crear manualmente archivos que esas herramientas pueden generar.
+- Campos iniciales de `Employee` aprobados: `internal_code` único, `first_name`, `last_name`, `birth_date` y `tax_id` opcional para simulaciones; clave primaria automática. Contratos, sueldo, jornada y antigüedad quedan fuera de la identidad personal.
+- Implementado únicamente `Employee` en `src/backend/employees/models.py`, con etiquetas españolas, identificadores ingleses y representación legible. Límites técnicos iniciales: código 50, nombre/apellidos 150 e identificación fiscal 30 caracteres. No se añadió validación de NIF/NIE ni unicidad fiscal. El campo fiscal opcional utiliza `blank=True` sin `null=True`.
+- Verificación: `manage.py check` correcto y previsualización de `makemigrations employees --dry-run --verbosity 3` correcta, sin escribir migraciones. El comando de tests del módulo encontró cero pruebas; no se considera cobertura funcional. No hay comando de lint configurado. `git diff --check` detectó finales CRLF preexistentes en `.gitignore`; no se modificó ese archivo como parte del modelo.
+- Siguiente paso del usuario: generar `makemigrations employees`, revisar `0001_initial.py` antes de aplicarla y después ejecutar `migrate` y `check`. La migración de Employee aún no se ha creado ni aplicado por el asistente y el modelo aún no se ha registrado en el administrador.
+- Cambios sin commits y pendientes de revisión. Continúan abiertas las decisiones de negocio indicadas en el Anexo G, incluido el significado de la entrada salarial.
+
+
+## Anexo J. Backend de registro aprobado e implementado (27/10/2026)
+
+El usuario generó y aplicó `employees.0001_initial`. Aprobó ampliar el backend con empresas, relaciones laborales y condiciones por vigencia; confirmó jornada expresada como porcentaje. La interfaz con plantillas queda para una fase posterior.
+
+Implementado en `backend.employees`:
+
+- `Company`: nombre e identificación fiscal única.
+- `EmploymentRelationship`: empleado y empresa protegidos contra borrado de referencias, inicio, fin opcional y fecha reconocida de antigüedad independiente.
+- `EmploymentCondition`: relación, vigencia, modalidad contractual, porcentaje de jornada con dos decimales entre 0,01 y 100, régimen y convenio descriptivos. No se afirma cobertura normativa de esos textos.
+- Intervalos `[inicio, fin)`, con fin excluido y opcional. Se rechazan intervalos vacíos/invertidos, condiciones fuera de la relación y solapamientos de condiciones de una misma relación. Se permiten condiciones contiguas; no se exige cobertura continua ni se prohíben relaciones simultáneas, reglas aún no acordadas.
+- Restricciones simples en base de datos, validación de coherencia en modelos y servicios transaccionales compartidos (`services.py`). La validación de solapamientos es de aplicación; no garantiza exclusión ante escritores externos o procesos concurrentes. Sigue vigente el destino monousuario.
+- API DRF bajo `/api/`: `employees/`, `companies/`, `employment-relationships/` y `employment-conditions/`, con listado, detalle, creación y actualización PUT/PATCH; sin borrado por API. Acceso reservado a usuarios staff autenticados mediante el mecanismo de sesión de Django. Admin registrado para los cuatro modelos. DRF añadido a `INSTALLED_APPS`.
+- `api/serializers.py` adapta errores específicos de validación de Django a respuestas HTTP 400; `api/views.py` y `api/urls.py` exponen las operaciones. No se añadieron dependencias nuevas ni frontend.
+- Condiciones pueden corregirse; no se implementan todavía revisiones inmutables ni auditoría de cambios. Modificar la jornada con efecto futuro requiere cerrar la vigencia anterior y registrar otra; no sobrescribir el histórico para representar un cambio nuevo.
+
+Verificación: Django check correcto, previsualización de la migración 0002 y 11 pruebas funcionales sobre registro, actualización parcial, límites de jornada, fechas, solapamientos, conservación de condiciones, referencias inexistentes, duplicados y permisos. Como la migración nueva queda para el ejercicio del usuario, las pruebas se ejecutaron sobre una base temporal sincronizando directamente los modelos de employees mediante `MIGRATION_MODULES` solo en el proceso de prueba. No se modificó la configuración persistente ni la base de desarrollo. Las pruebas normales deberán ejecutarse de nuevo una vez generada la migración. No hay comando de lint configurado.
+
+Pendiente del usuario: ejecutar `makemigrations employees`, revisar el archivo 0002, aplicar `migrate` y ejecutar `test backend.employees` y `check`. Pendiente funcional: retribuciones, reglas normativas, comprobación portable y frontend de registro. Cambios sin commits, pendientes de revisión.
