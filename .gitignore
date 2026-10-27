@@ -1,0 +1,18 @@
+# Entorno virtual
+.venv/
+
+# Archivos generados por Python
+__pycache__/
+*.py[cod]
+
+# Metadatos de archivos descargados en Windows
+*:Zone.Identifier
+
+# Variables de entorno
+.env
+
+# Base de datos local de desarrollo y archivos auxiliares
+src/db.sqlite3
+src/db.sqlite3-journal
+src/db.sqlite3-wal
+src/db.sqlite3-shm
