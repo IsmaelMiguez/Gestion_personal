@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="2200" viewBox="0 0 1600 2200">
+<rect width="1600" height="2200" fill="#f8fafc"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="none" stroke="#334155"/></marker></defs>
+<text fill="#0f172a" font-family="monospace" font-size="32">
+<tspan x="60" y="57.0">RRHH TOOL | Modelo sencillo</tspan>
+</text>
+<text fill="#334155" font-family="monospace" font-size="18">
+<tspan x="60" y="96.0">Cuatro modelos. Un trabajador, su contrato y las condiciones de ese contrato.</tspan>
+</text>
+<text fill="#1d4ed8" font-family="monospace" font-size="16">
+<tspan x="60" y="129.0">Azul: campos añadidos. Nombres de formulario/API; importes almacenados en céntimos.</tspan>
+</text>
+<rect x="60" y="180" width="520" height="350" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<rect x="60" y="180" width="520" height="86" fill="#dbeafe" stroke="#334155" stroke-width="1.5"/>
+<text fill="#0f172a" font-family="monospace" font-size="23">
+<tspan x="80" y="215.0">Employee</tspan>
+</text>
+<text fill="#334155" font-family="monospace" font-size="16">
+<tspan x="80" y="245.0">Empleado: identidad personal</tspan>
+</text>
+<text fill="#334155" font-family="monospace" font-size="18">
+<tspan x="80" y="302.0">id: identificador automático</tspan>
+<tspan x="80" y="327.2">internal_code: código actual (*)</tspan>
+<tspan x="80" y="352.4">first_name: nombre</tspan>
+<tspan x="80" y="377.6">last_name: apellidos</tspan>
+<tspan x="80" y="402.8">birth_date: nacimiento</tspan>
+<tspan x="80" y="428.0">identification_type: tipo documento</tspan>
+<tspan x="80" y="453.2">tax_id: número documento</tspan>
+</text>
+<rect x="1020" y="180" width="520" height="230" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<rect x="1020" y="180" width="520" height="86" fill="#dcfce7" stroke="#334155" stroke-width="1.5"/>
+<text fill="#0f172a" font-family="monospace" font-size="23">
+<tspan x="1040" y="215.0">Company</tspan>
+</text>
+<text fill="#334155" font-family="monospace" font-size="16">
+<tspan x="1040" y="245.0">Empresa empleadora</tspan>
+</text>
+<text fill="#334155" font-family="monospace" font-size="18">
+<tspan x="1040" y="302.0">id: identificador automático</tspan>
+<tspan x="1040" y="327.2">name: nombre</tspan>
+<tspan x="1040" y="352.4">tax_id: identificación fiscal</tspan>
+</text>
+<rect x="540" y="660" width="520" height="300" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<rect x="540" y="660" width="520" height="86" fill="#e0e7ff" stroke="#334155" stroke-width="1.5"/>
+<text fill="#0f172a" font-family="monospace" font-size="23">
+<tspan x="560" y="695.0">EmploymentRelationship</tspan>
+</text>
+<text fill="#334155" font-family="monospace" font-size="16">
+<tspan x="560" y="725.0">Relación laboral / contrato</tspan>
+</text>
+<text fill="#334155" font-family="monospace" font-size="18">
+<tspan x="560" y="782.0">id: identificador automático</tspan>
+<tspan x="560" y="807.2">employee: referencia al empleado</tspan>
+<tspan x="560" y="832.4">company: referencia a la empresa</tspan>
+<tspan x="560" y="857.6">start_date: inicio</tspan>
+<tspan x="560" y="882.8">end_date: fin opcional</tspan>
+<tspan x="560" y="908.0">seniority_date: antigüedad reconocida</tspan>
+</text>
+<rect x="390" y="1110" width="820" height="790" fill="#ffffff" stroke="#334155" stroke-width="1.5"/>
+<rect x="390" y="1110" width="820" height="86" fill="#fef3c7" stroke="#334155" stroke-width="1.5"/>
+<text fill="#0f172a" font-family="monospace" font-size="23">
+<tspan x="410" y="1145.0">EmploymentCondition</tspan>
+</text>
+<text fill="#334155" font-family="monospace" font-size="16">
+<tspan x="410" y="1175.0">Condiciones de trabajo y retribución</tspan>
+</text>
+<text fill="#334155" font-family="monospace" font-size="18">
+<tspan x="410" y="1232.0">id: identificador automático</tspan>
+<tspan x="410" y="1257.2">employment_relationship: referencia al contrato</tspan>
+<tspan x="410" y="1282.4">valid_from / valid_until: periodo de vigencia</tspan>
+<tspan x="410" y="1307.6">contract_type: modalidad contractual</tspan>
+<tspan x="410" y="1332.8">working_time_percentage: porcentaje de jornada</tspan>
+<tspan x="410" y="1358.0">social_security_regime: régimen</tspan>
+<tspan x="410" y="1383.2">collective_agreement: convenio</tspan>
+</text>
+<text fill="#1d4ed8" font-family="monospace" font-size="18">
+<tspan x="410" y="1428.0">job_title: puesto de trabajo</tspan>
+<tspan x="410" y="1453.2">salary_amount: importe salarial</tspan>
+<tspan x="410" y="1478.4">salary_period: anual o mensual</tspan>
+<tspan x="410" y="1503.6">payments_per_year: 12 o 14 pagas</tspan>
+<tspan x="410" y="1528.8">employee_insurance_exempt: seguro trabajador exento</tspan>
+<tspan x="410" y="1554.0">employee_insurance_taxable: seguro trabajador sujeto</tspan>
+<tspan x="410" y="1579.2">family_insurance_exempt: seguro familia exento</tspan>
+<tspan x="410" y="1604.4">family_insurance_taxable: seguro familia sujeto</tspan>
+<tspan x="410" y="1629.6">fixed_supplement: complemento fijo</tspan>
+<tspan x="410" y="1654.8">withholding_rate: porcentaje IRPF</tspan>
+</text>
+<text fill="#475569" font-family="monospace" font-size="18">
+<tspan x="410" y="1718.0">Datos monetarios implementados en este modelo.</tspan>
+<tspan x="410" y="1743.2">Pendiente acordar si salary_amount es base o total.</tspan>
+<tspan x="410" y="1768.4">Un cambio de sueldo/jornada abre otra vigencia;</tspan>
+<tspan x="410" y="1793.6">las condiciones anteriores se conservan.</tspan>
+</text>
+<polyline points="320,540 320,805 530,805" fill="none" stroke="#334155" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text fill="#334155" font-family="monospace" font-size="16">
+<tspan x="334" y="565.0">1 empleado</tspan>
+</text>
+<text fill="#334155" font-family="monospace" font-size="16">
+<tspan x="337" y="790.0">0..* contratos</tspan>
+</text>
+<polyline points="1280,420 1280,805 1070,805" fill="none" stroke="#334155" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text fill="#334155" font-family="monospace" font-size="16">
+<tspan x="1296" y="445.0">1 empresa</tspan>
+</text>
+<text fill="#334155" font-family="monospace" font-size="16">
+<tspan x="1090" y="790.0">0..* contratos</tspan>
+</text>
+<polyline points="800,970 800,1100" fill="none" stroke="#334155" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text fill="#334155" font-family="monospace" font-size="16">
+<tspan x="822" y="994.0">1 contrato</tspan>
+</text>
+<text fill="#334155" font-family="monospace" font-size="16">
+<tspan x="822" y="1076.0">0..* periodos de condiciones</tspan>
+</text>
+<text fill="#0f172a" font-family="monospace" font-size="22">
+<tspan x="60" y="1977.0">ALCANCE DE ESTA FASE</tspan>
+</text>
+<text fill="#475569" font-family="monospace" font-size="17">
+<tspan x="60" y="2015.0">Registrar empleado + contrato + condiciones en un mismo flujo de pantalla.</tspan>
+<tspan x="60" y="2038.8">Sin tablas separadas para seguros, conceptos, puestos o políticas.</tspan>
+<tspan x="60" y="2062.6">Las reglas de cálculo serán funciones Python; nóminas y bonus se abordarán después.</tspan>
+<tspan x="60" y="2086.4">Cada contrato pertenece a un empleado y a una empresa. Se conserva el histórico.</tspan>
+<tspan x="60" y="2110.2">(*) internal_code existe hoy; su retirada u opcionalidad aún no se ha implementado.</tspan>
+<tspan x="60" y="2134.0">Campos azules implementados; migración 0003 pendiente de aplicar en la base local.</tspan>
+</text>
+</svg>

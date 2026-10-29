@@ -1859,3 +1859,49 @@ Implementado en `backend.employees`:
 Verificación: Django check correcto, previsualización de la migración 0002 y 11 pruebas funcionales sobre registro, actualización parcial, límites de jornada, fechas, solapamientos, conservación de condiciones, referencias inexistentes, duplicados y permisos. Como la migración nueva queda para el ejercicio del usuario, las pruebas se ejecutaron sobre una base temporal sincronizando directamente los modelos de employees mediante `MIGRATION_MODULES` solo en el proceso de prueba. No se modificó la configuración persistente ni la base de desarrollo. Las pruebas normales deberán ejecutarse de nuevo una vez generada la migración. No hay comando de lint configurado.
 
 Pendiente del usuario: ejecutar `makemigrations employees`, revisar el archivo 0002, aplicar `migrate` y ejecutar `test backend.employees` y `check`. Pendiente funcional: retribuciones, reglas normativas, comprobación portable y frontend de registro. Cambios sin commits, pendientes de revisión.
+
+
+## Anexo K. Identificación de empleados (29/10/2026)
+
+El usuario confirma que aplicó 0002 y ejecutó las 11 pruebas originales y Django check correctamente. Solicita tipo de identificación seleccionable y valor de texto.
+
+Implementado `Employee.identification_type` mediante TextChoices (DNI, NIE, PASSPORT/Pasaporte, OTHER/Otro documento), expuesto en API y como desplegable automático del administrador. `tax_id` conserva su nombre y valores para compatibilidad, con etiqueta «número de identificación». Ambos campos siguen siendo opcionales para simulaciones y registros anteriores: no se infiere un tipo ni se convierte el pasaporte en NIF. No se valida aún formato, correspondencia entre tipo/valor o dígito de control. La identificación fiscal de Company permanece sin cambios. Los formularios futuros deberán utilizar estas mismas opciones.
+
+Comprobaciones: check correcto; previsualización de migración 0003 sin crearla; 13 pruebas correctas en base temporal sincronizada directamente desde modelos, sin modificar la base del usuario. Pendiente generar/aplicar la migración y ejecutar las pruebas normales. Diagramas Markdown y Excalidraw actualizados. Sin commits.
+
+Consulta del usuario sobre puesto y salario: el puesto se recomienda como condición laboral con vigencia en EmploymentCondition; la retribución, sus conceptos y vigencias en entidades propias vinculadas a la relación laboral. Esta ampliación no está implementada ni aprobada todavía. Sigue pendiente definir si el importe salarial introducido es sueldo base o total y especificar el tratamiento de seguros y demás conceptos.
+
+## Anexo L. Mapa global propuesto (29/10/2026)
+
+A petición del usuario se añade `DIAGRAMA_ARQUITECTURA_PROPUESTA.excalidraw`, con guía en `DIAGRAMA_ARQUITECTURA_PROPUESTA.md`. Contiene 37 clases distribuidas por dominio y diferencia modelos actuales, ampliaciones propuestas y clases Python del motor. El diagrama actual `DIAGRAMA_DE_CLASES.excalidraw` se conserva. El mapa global sirve para ubicar puesto, retribuciones, conceptos, nóminas, normativa, bonus y trazabilidad; no supone aprobación de todos sus modelos ni autoriza implementarlos en bloque. No se modifican código, migraciones ni datos.
+
+## Anexo M. Simplificación solicitada (29/10/2026)
+
+El usuario rechaza la complejidad del mapa de 37 clases y solicita un producto sencillo: trabajador, relación laboral y sueldo/demás datos en las condiciones del contrato, sin códigos de negocio para todo. Queda descartada la propuesta amplia como objetivo inmediato.
+
+Se sustituye `DIAGRAMA_ARQUITECTURA_PROPUESTA.excalidraw` y su guía por una propuesta de cuatro modelos reutilizando Employee, Company, EmploymentRelationship y EmploymentCondition. Puesto, salario, unidad anual/mensual, pagas, cuatro seguros, complemento fijo e IRPF irían en EmploymentCondition. Se propone conservar vigencias para el histórico y utilizar funciones Python para las reglas, sin tablas ni catálogos por anticipado. La interfaz puede registrar empleado/contrato/condiciones en un flujo conjunto.
+
+No se cambian todavía modelos, API, migraciones ni datos. Sigue pendiente concretar sueldo base o total; también acordar retirada u opcionalidad de internal_code. No se presume que la petición de sencillez imponga unicidad de contrato por trabajador. Las nóminas y bonus se modelarán cuando llegue su fase. Este anexo prevalece sobre las recomendaciones de normalización extensiva de anexos anteriores.
+
+
+## Anexo N. Diagrama simplificado regenerado (29/10/2026)
+
+El usuario eliminó los diagramas anteriores por problemas de generación. Se crean desde cero `DIAGRAMA_MODELOS_SIMPLIFICADO.excalidraw` (editable) y `DIAGRAMA_MODELOS_SIMPLIFICADO.svg` (consulta directa), reemplazando las referencias a archivos eliminados de anexos anteriores.
+
+El diseño conserva únicamente los cuatro modelos existentes: Employee, Company, EmploymentRelationship y EmploymentCondition. Se muestran en azul y con prefijo + los campos propuestos en condiciones (puesto, salario y unidad, pagas, cuatro seguros, complemento e IRPF); no están implementados. Los datos de identidad y empresa siguen separados de las condiciones del contrato; no se añaden modelos de catálogos, seguros o políticas. Nóminas y bonus quedan para su fase. No se impone una relación única por trabajador ni se elimina todavía internal_code. Sigue pendiente definir importe base o total.
+
+Verificación documental: JSON y SVG XML válidos, identificadores únicos, cuatro clases y tres asociaciones, textos dentro de sus tarjetas y elementos dentro del lienzo. No se ha comprobado la importación en la aplicación Excalidraw. No se modifican código, migraciones ni datos; sin commits.
+
+## Anexo O. Implementación del modelo simplificado (29/10/2026)
+
+El usuario aprueba el diagrama simplificado y solicita adaptar el código. Se mantienen exactamente cuatro modelos. EmploymentCondition incorpora puesto, salario y unidad anual/mensual, pagas (12/14), cuatro seguros, complemento fijo e IRPF; no se crean entidades de catálogos o conceptos.
+
+Los importes se guardan como enteros de céntimos (`salary_amount_cents`, cuatro campos de seguros con sufijo `_cents` y `fixed_supplement_cents`). El IRPF se guarda en centésimas de porcentaje (`withholding_rate_basis_points`, de 0 a 10000). La API y el formulario del administrador muestran euros y porcentajes con dos decimales mediante adaptadores pequeños; no hacen cálculos con float. En API se usan `salary_amount`, nombres de seguros sin sufijo `_cents`, `fixed_supplement` y `withholding_rate`. Los importes JSON se representan como cadenas decimales. Los seguros y complemento se registran como importes mensuales, siguiendo el libro; no se implementa todavía su tratamiento salarial/fiscal ni su prorrateo.
+
+La unidad MONTHLY identifica el importe de una paga ordinaria; ANNUAL identifica el importe anual introducido. No se calcula ni convierte salario anual/mensual, antigüedad, cuotas o netos. Sigue pendiente respuesta sobre sueldo base frente a total: no se asume una opción. El importe salarial requiere indicar unidad y número de pagas, sin cifras implícitas.
+
+Los campos nuevos permiten datos ausentes para preservar registros existentes. NULL significa desconocido/no informado y es distinto de cero. Puesto y unidad usan texto vacío cuando no están informados. No se asignan salarios ni seguros cero por migración. El formulario nuevo presenta 14 pagas como valor inicial de negocio; la API y el modelo no suponen ese valor cuando no se proporciona. Se conservan internal_code y las cardinalidades actuales; no se obliga a un único contrato por empleado.
+
+`forms.py` contiene el formulario reutilizable que transforma euros a céntimos y agrupa el registro en el administrador. El administrador usa los servicios para actualizar los campos persistidos, incluidos los importes convertidos. API, administrador y validaciones temporales conservan el flujo existente.
+
+Generada `0003_simplified_employment_conditions`, que incluye también la identificación previamente pendiente de migración. No se aplica a la base de desarrollo: el usuario continuará con `migrate`. Verificación: 20 tests correctos ejecutados con migraciones reales en base temporal; Django check correcto; makemigrations --check --dry-run sin cambios; prueba de actualización 0002 a 0003 con datos sintéticos que conserva las referencias e identificación y deja nuevos importes sin informar. El plan de la base local solo muestra 0003 pendiente. No hay comando de lint configurado. Diagramas Excalidraw/SVG actualizados para marcar los campos implementados y su presentación. Sin cambios de dependencias ni commits.

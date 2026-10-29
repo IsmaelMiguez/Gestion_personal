@@ -116,3 +116,162 @@ class EmploymentRegistrationTests(TestCase):
         }, format="json")
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Employee.objects.count(), 1)
+
+    def test_identification_type_choices_and_value_are_preserved(self):
+        for identification_type in Employee.IdentificationType.values:
+            with self.subTest(identification_type=identification_type):
+                response = self.client.patch(
+                    f"/api/employees/{self.employee.pk}/",
+                    {
+                        "identification_type": identification_type,
+                        "tax_id": "SYNTHETIC-001",
+                    },
+                    format="json",
+                )
+                self.assertEqual(response.status_code, 200, response.data)
+                self.employee.refresh_from_db()
+                self.assertEqual(
+                    self.employee.identification_type, identification_type
+                )
+                self.assertEqual(self.employee.tax_id, "SYNTHETIC-001")
+
+    def test_unknown_identification_type_is_rejected(self):
+        response = self.client.patch(
+            f"/api/employees/{self.employee.pk}/",
+            {"identification_type": "UNKNOWN"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("identification_type", response.data)
+
+    def test_retribution_api_round_trip_is_exact_and_partial_updates_preserve_it(self):
+        payload = {
+            **self.values,
+            "employment_relationship": self.relationship.pk,
+            "job_title": "Administración",
+            "salary_amount": "30000.01",
+            "salary_period": "ANNUAL",
+            "payments_per_year": 14,
+            "employee_insurance_exempt": "42.19",
+            "employee_insurance_taxable": "55.01",
+            "family_insurance_exempt": "126.56",
+            "family_insurance_taxable": "165.03",
+            "fixed_supplement": "0.10",
+            "withholding_rate": "19.37",
+        }
+        response = self.client.post(
+            "/api/employment-conditions/", payload, format="json"
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        condition = EmploymentCondition.objects.get(pk=response.data["id"])
+        self.assertEqual(condition.salary_amount_cents, 3000001)
+        self.assertEqual(condition.withholding_rate_basis_points, 1937)
+        for name in (
+            "salary_amount", "employee_insurance_exempt",
+            "employee_insurance_taxable", "family_insurance_exempt",
+            "family_insurance_taxable", "fixed_supplement", "withholding_rate",
+        ):
+            self.assertEqual(response.data[name], payload[name])
+        response = self.client.patch(
+            f"/api/employment-conditions/{condition.pk}/",
+            {"job_title": "Responsable de administración"}, format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["salary_amount"], "30000.01")
+
+    def test_salary_requires_explicit_unit_and_number_of_payments(self):
+        condition = create_record(EmploymentCondition, self.values)
+        url = f"/api/employment-conditions/{condition.pk}/"
+        response = self.client.patch(
+            url, {"salary_amount": "2500.00"}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("salary_period", response.data)
+        self.assertIn("payments_per_year", response.data)
+        condition.refresh_from_db()
+        self.assertIsNone(condition.salary_amount_cents)
+        response = self.client.patch(
+            url, {"salary_period": "MONTHLY"}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_invalid_retribution_inputs_are_rejected(self):
+        condition = create_record(EmploymentCondition, self.values)
+        url = f"/api/employment-conditions/{condition.pk}/"
+        cases = (
+            {"fixed_supplement": "-0.01"},
+            {"employee_insurance_exempt": "0.001"},
+            {"withholding_rate": "100.01"},
+            {"payments_per_year": 13},
+            {"salary_period": "WEEKLY"},
+        )
+        for payload in cases:
+            with self.subTest(payload=payload):
+                response = self.client.patch(url, payload, format="json")
+                self.assertEqual(response.status_code, 400, response.data)
+
+    def test_missing_amount_and_explicit_zero_are_distinct(self):
+        condition = create_record(EmploymentCondition, self.values)
+        self.assertIsNone(condition.fixed_supplement_cents)
+        response = self.client.patch(
+            f"/api/employment-conditions/{condition.pk}/",
+            {"fixed_supplement": "0.00"}, format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["fixed_supplement"], "0.00")
+        self.assertIsNone(response.data["employee_insurance_exempt"])
+
+    def test_new_salary_period_does_not_overwrite_previous_salary(self):
+        first = create_record(EmploymentCondition, {
+            **self.values, "salary_amount_cents": 3000000,
+            "salary_period": "ANNUAL", "payments_per_year": 14,
+        })
+        create_record(EmploymentCondition, {
+            **self.values, "valid_from": date(2026, 7, 1),
+            "valid_until": None, "salary_amount_cents": 3300000,
+            "salary_period": "ANNUAL", "payments_per_year": 12,
+        })
+        first.refresh_from_db()
+        self.assertEqual(first.salary_amount_cents, 3000000)
+        self.assertEqual(first.payments_per_year, 14)
+
+    def test_admin_form_creates_and_updates_euro_amounts(self):
+        from django.contrib import admin
+        from django.test import RequestFactory
+
+        model_admin = admin.site._registry[EmploymentCondition]
+        request = RequestFactory().get("/admin/employees/employmentcondition/add/")
+        request.user = get_user_model().objects.create_superuser(
+            username="admin-test", password="Test-only-strong-password-123"
+        )
+        form_class = model_admin.get_form(request)
+        payload = {
+            **self.values, "employment_relationship": self.relationship.pk,
+            "salary_amount": "2500.01", "salary_period": "MONTHLY",
+            "payments_per_year": 14, "withholding_rate": "15.25",
+            "fixed_supplement": "10.10",
+        }
+        form = form_class(data=payload)
+        self.assertTrue(form.is_valid(), form.errors)
+        instance = form.save(commit=False)
+        model_admin.save_model(request, instance, form, False)
+        self.assertEqual(instance.salary_amount_cents, 250001)
+        self.assertEqual(instance.withholding_rate_basis_points, 1525)
+        payload["salary_amount"] = "2600.02"
+        form = model_admin.get_form(request, instance)(
+            data=payload, instance=instance
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        instance = form.save(commit=False)
+        model_admin.save_model(request, instance, form, True)
+        instance.refresh_from_db()
+        self.assertEqual(instance.salary_amount_cents, 260002)
+        self.assertEqual(instance.fixed_supplement_cents, 1010)
+
+    def test_database_rejects_invalid_payment_count(self):
+        from django.db import IntegrityError, transaction
+
+        condition = create_record(EmploymentCondition, self.values)
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            EmploymentCondition.objects.filter(pk=condition.pk).update(
+                payments_per_year=13
+            )

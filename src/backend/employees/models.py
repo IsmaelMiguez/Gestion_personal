@@ -8,11 +8,21 @@ from django.db import models
 class Employee(models.Model):
     """Store personal identity independently of employment conditions."""
 
+    class IdentificationType(models.TextChoices):
+        DNI = "DNI", "DNI"
+        NIE = "NIE", "NIE"
+        PASSPORT = "PASSPORT", "Pasaporte"
+        OTHER = "OTHER", "Otro documento"
+
     internal_code = models.CharField("código interno", max_length=50, unique=True)
     first_name = models.CharField("nombre", max_length=150)
     last_name = models.CharField("apellidos", max_length=150)
     birth_date = models.DateField("fecha de nacimiento")
-    tax_id = models.CharField("identificación fiscal", max_length=30, blank=True)
+    identification_type = models.CharField(
+        "tipo de identificación", max_length=20,
+        choices=IdentificationType.choices, blank=True,
+    )
+    tax_id = models.CharField("número de identificación", max_length=30, blank=True)
 
     class Meta:
         verbose_name = "trabajador"
@@ -79,6 +89,23 @@ class EmploymentRelationship(models.Model):
 class EmploymentCondition(models.Model):
     """Describe conditions over an interval with an exclusive end date."""
 
+    class SalaryPeriod(models.TextChoices):
+        ANNUAL = "ANNUAL", "Anual"
+        MONTHLY = "MONTHLY", "Mensual por paga ordinaria"
+
+    class PaymentCount(models.IntegerChoices):
+        TWELVE = 12, "12 pagas"
+        FOURTEEN = 14, "14 pagas"
+
+    money_fields = (
+        "salary_amount_cents",
+        "employee_insurance_exempt_cents",
+        "employee_insurance_taxable_cents",
+        "family_insurance_exempt_cents",
+        "family_insurance_taxable_cents",
+        "fixed_supplement_cents",
+    )
+
     employment_relationship = models.ForeignKey(
         EmploymentRelationship, on_delete=models.PROTECT, related_name="conditions"
     )
@@ -94,6 +121,42 @@ class EmploymentCondition(models.Model):
     )
     social_security_regime = models.CharField("régimen", max_length=150)
     collective_agreement = models.CharField("convenio", max_length=200)
+    job_title = models.CharField("puesto de trabajo", max_length=150, blank=True)
+    salary_amount_cents = models.PositiveBigIntegerField(
+        "importe salarial (céntimos)", null=True, blank=True,
+        validators=[MaxValueValidator(999999999999)],
+    )
+    salary_period = models.CharField(
+        "unidad del salario", max_length=10, choices=SalaryPeriod.choices,
+        blank=True,
+    )
+    payments_per_year = models.PositiveSmallIntegerField(
+        "número de pagas", choices=PaymentCount.choices, null=True, blank=True,
+    )
+    employee_insurance_exempt_cents = models.PositiveBigIntegerField(
+        "seguro trabajador exento (céntimos)", null=True, blank=True,
+        validators=[MaxValueValidator(999999999999)],
+    )
+    employee_insurance_taxable_cents = models.PositiveBigIntegerField(
+        "seguro trabajador sujeto (céntimos)", null=True, blank=True,
+        validators=[MaxValueValidator(999999999999)],
+    )
+    family_insurance_exempt_cents = models.PositiveBigIntegerField(
+        "seguro familia exento (céntimos)", null=True, blank=True,
+        validators=[MaxValueValidator(999999999999)],
+    )
+    family_insurance_taxable_cents = models.PositiveBigIntegerField(
+        "seguro familia sujeto (céntimos)", null=True, blank=True,
+        validators=[MaxValueValidator(999999999999)],
+    )
+    fixed_supplement_cents = models.PositiveBigIntegerField(
+        "complemento fijo (céntimos)", null=True, blank=True,
+        validators=[MaxValueValidator(999999999999)],
+    )
+    withholding_rate_basis_points = models.PositiveSmallIntegerField(
+        "IRPF (centésimas de porcentaje)", null=True, blank=True,
+        validators=[MaxValueValidator(10000)],
+    )
 
     class Meta:
         verbose_name = "condición laboral"
@@ -109,10 +172,47 @@ class EmploymentCondition(models.Model):
                 & models.Q(working_time_percentage__lte=100),
                 name="condition_valid_percentage",
             ),
+            models.CheckConstraint(
+                condition=models.Q(payments_per_year__isnull=True)
+                | models.Q(payments_per_year__in=[12, 14]),
+                name="condition_valid_payment_count",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(withholding_rate_basis_points__isnull=True)
+                | models.Q(withholding_rate_basis_points__lte=10000),
+                name="condition_valid_withholding_rate",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        salary_amount_cents__isnull=True, salary_period=""
+                    )
+                    | (
+                        models.Q(
+                            salary_amount_cents__isnull=False,
+                            salary_period__in=["ANNUAL", "MONTHLY"],
+                            payments_per_year__isnull=False,
+                        )
+                    )
+                ),
+                name="condition_salary_has_unit_and_payments",
+            ),
         ]
 
     def clean(self):
         super().clean()
+        if self.salary_amount_cents is None and self.salary_period:
+            raise ValidationError({
+                "salary_period": "Indica también el importe del salario."
+            })
+        if self.salary_amount_cents is not None:
+            errors = {}
+            if not self.salary_period:
+                errors["salary_period"] = "Indica si el importe es anual o mensual."
+            if self.payments_per_year is None:
+                errors["payments_per_year"] = "Indica el número de pagas."
+            if errors:
+                raise ValidationError(errors)
         if not self.employment_relationship_id or not self.valid_from:
             return
         relationship = EmploymentRelationship.objects.filter(
