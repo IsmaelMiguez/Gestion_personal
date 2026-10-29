@@ -4,7 +4,12 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .. import services
-from ..models import Company, Employee, EmploymentCondition, EmploymentRelationship
+from ..models import (
+    Company,
+    Employee,
+    EmploymentCondition,
+    EmploymentRelationship,
+)
 
 
 class HundredthsField(serializers.DecimalField):
@@ -12,8 +17,13 @@ class HundredthsField(serializers.DecimalField):
 
     def __init__(self, **kwargs):
         super().__init__(
-            max_digits=12, decimal_places=2, min_value=Decimal("0"),
-            allow_null=True, required=False, coerce_to_string=True, **kwargs,
+            max_digits=12,
+            decimal_places=2,
+            min_value=Decimal("0"),
+            allow_null=True,
+            required=False,
+            coerce_to_string=True,
+            **kwargs,
         )
 
     def run_validation(self, data):
@@ -42,8 +52,13 @@ class EmployeeSerializer(ValidatedModelSerializer):
     class Meta:
         model = Employee
         fields = (
-            "id", "internal_code", "first_name", "last_name", "birth_date",
-            "identification_type", "tax_id",
+            "id",
+            "internal_code",
+            "first_name",
+            "last_name",
+            "birth_date",
+            "identification_type",
+            "tax_id",
         )
 
 
@@ -57,7 +72,12 @@ class EmploymentRelationshipSerializer(ValidatedModelSerializer):
     class Meta:
         model = EmploymentRelationship
         fields = (
-            "id", "employee", "company", "start_date", "end_date", "seniority_date",
+            "id",
+            "employee",
+            "company",
+            "start_date",
+            "end_date",
+            "seniority_date",
         )
 
 
@@ -83,10 +103,22 @@ class EmploymentConditionSerializer(ValidatedModelSerializer):
     class Meta:
         model = EmploymentCondition
         fields = (
-            "id", "employment_relationship", "valid_from", "valid_until",
-            "contract_type", "working_time_percentage", "social_security_regime",
-            "collective_agreement", "job_title", "salary_amount",
-            "salary_period", "payments_per_year", "employee_insurance_exempt",
-            "employee_insurance_taxable", "family_insurance_exempt",
-            "family_insurance_taxable", "fixed_supplement", "withholding_rate",
+            "id",
+            "employment_relationship",
+            "valid_from",
+            "valid_until",
+            "contract_type",
+            "working_time_percentage",
+            "social_security_regime",
+            "collective_agreement",
+            "job_title",
+            "salary_amount",
+            "salary_period",
+            "payments_per_year",
+            "employee_insurance_exempt",
+            "employee_insurance_taxable",
+            "family_insurance_exempt",
+            "family_insurance_taxable",
+            "fixed_supplement",
+            "withholding_rate",
         )

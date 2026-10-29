@@ -6,39 +6,66 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from .models import Company, Employee, EmploymentCondition, EmploymentRelationship
+from .models import (
+    Company,
+    Employee,
+    EmploymentCondition,
+    EmploymentRelationship,
+)
 from .services import create_record, update_record
 
 
 class EmploymentRegistrationTests(TestCase):
     def setUp(self):
-        self.employee = create_record(Employee, {
-            "internal_code": "EMP-001", "first_name": "Alex", "last_name": "Example",
-            "birth_date": date(1990, 1, 1), "tax_id": "",
-        })
-        self.company = create_record(Company, {"name": "Example", "tax_id": "TEST-001"})
-        self.relationship = create_record(EmploymentRelationship, {
-            "employee": self.employee, "company": self.company,
-            "start_date": date(2026, 1, 1), "end_date": None,
-            "seniority_date": date(2020, 1, 1),
-        })
+        self.employee = create_record(
+            Employee,
+            {
+                "internal_code": "EMP-001",
+                "first_name": "Alex",
+                "last_name": "Example",
+                "birth_date": date(1990, 1, 1),
+                "tax_id": "",
+            },
+        )
+        self.company = create_record(
+            Company, {"name": "Example", "tax_id": "TEST-001"}
+        )
+        self.relationship = create_record(
+            EmploymentRelationship,
+            {
+                "employee": self.employee,
+                "company": self.company,
+                "start_date": date(2026, 1, 1),
+                "end_date": None,
+                "seniority_date": date(2020, 1, 1),
+            },
+        )
         self.values = {
             "employment_relationship": self.relationship,
-            "valid_from": date(2026, 1, 1), "valid_until": date(2026, 7, 1),
-            "contract_type": "Indefinido", "working_time_percentage": Decimal("50"),
+            "valid_from": date(2026, 1, 1),
+            "valid_until": date(2026, 7, 1),
+            "contract_type": "Indefinido",
+            "working_time_percentage": Decimal("50"),
             "social_security_regime": "Pendiente de clasificación",
             "collective_agreement": "Convenio de prueba",
         }
         self.client = APIClient()
-        user = get_user_model().objects.create_user(username="tester", is_staff=True)
+        user = get_user_model().objects.create_user(
+            username="tester", is_staff=True
+        )
         self.client.force_authenticate(user=user)
 
     def test_adjacent_conditions_preserve_history(self):
         first = create_record(EmploymentCondition, self.values)
-        second = create_record(EmploymentCondition, {
-            **self.values, "valid_from": date(2026, 7, 1),
-            "valid_until": None, "working_time_percentage": Decimal("100"),
-        })
+        second = create_record(
+            EmploymentCondition,
+            {
+                **self.values,
+                "valid_from": date(2026, 7, 1),
+                "valid_until": None,
+                "working_time_percentage": Decimal("100"),
+            },
+        )
         self.assertEqual(self.relationship.conditions.count(), 2)
         first.refresh_from_db()
         self.assertEqual(first.working_time_percentage, Decimal("50"))
@@ -47,30 +74,47 @@ class EmploymentRegistrationTests(TestCase):
     def test_overlapping_condition_is_rejected_without_writing(self):
         create_record(EmploymentCondition, self.values)
         with self.assertRaises(ValidationError):
-            create_record(EmploymentCondition, {**self.values, "valid_until": None})
+            create_record(
+                EmploymentCondition, {**self.values, "valid_until": None}
+            )
         self.assertEqual(self.relationship.conditions.count(), 1)
 
     def test_invalid_percentages_are_rejected(self):
         for percentage in ("0", "-1", "100.01"):
-            with self.subTest(percentage=percentage), self.assertRaises(ValidationError):
-                create_record(EmploymentCondition, {
-                    **self.values, "working_time_percentage": Decimal(percentage),
-                })
+            with (
+                self.subTest(percentage=percentage),
+                self.assertRaises(ValidationError),
+            ):
+                create_record(
+                    EmploymentCondition,
+                    {
+                        **self.values,
+                        "working_time_percentage": Decimal(percentage),
+                    },
+                )
 
     def test_condition_must_fit_relationship(self):
         with self.assertRaises(ValidationError):
-            create_record(EmploymentCondition, {
-                **self.values, "valid_from": date(2025, 12, 31),
-            })
+            create_record(
+                EmploymentCondition,
+                {
+                    **self.values,
+                    "valid_from": date(2025, 12, 31),
+                },
+            )
         update_record(self.relationship, {"end_date": date(2026, 6, 1)})
         with self.assertRaises(ValidationError):
             create_record(EmploymentCondition, self.values)
 
     def test_reversed_interval_is_rejected(self):
         with self.assertRaises(ValidationError):
-            create_record(EmploymentCondition, {
-                **self.values, "valid_until": self.values["valid_from"],
-            })
+            create_record(
+                EmploymentCondition,
+                {
+                    **self.values,
+                    "valid_until": self.values["valid_from"],
+                },
+            )
 
     def test_shortening_relationship_cannot_orphan_conditions(self):
         create_record(EmploymentCondition, self.values)
@@ -80,26 +124,42 @@ class EmploymentRegistrationTests(TestCase):
         self.assertIsNone(self.relationship.end_date)
 
     def test_api_registration_and_partial_update(self):
-        payload = {**self.values, "employment_relationship": self.relationship.pk}
-        response = self.client.post("/api/employment-conditions/", payload, format="json")
+        payload = {
+            **self.values,
+            "employment_relationship": self.relationship.pk,
+        }
+        response = self.client.post(
+            "/api/employment-conditions/", payload, format="json"
+        )
         self.assertEqual(response.status_code, 201, response.data)
         response = self.client.patch(
-            f'/api/employment-conditions/{response.data["id"]}/',
-            {"working_time_percentage": "75.00"}, format="json",
+            f"/api/employment-conditions/{response.data['id']}/",
+            {"working_time_percentage": "75.00"},
+            format="json",
         )
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data["working_time_percentage"], "75.00")
 
     def test_api_reports_domain_validation(self):
         create_record(EmploymentCondition, self.values)
-        payload = {**self.values, "employment_relationship": self.relationship.pk}
-        response = self.client.post("/api/employment-conditions/", payload, format="json")
+        payload = {
+            **self.values,
+            "employment_relationship": self.relationship.pk,
+        }
+        response = self.client.post(
+            "/api/employment-conditions/", payload, format="json"
+        )
         self.assertEqual(response.status_code, 400)
         self.assertIn("valid_from", response.data)
 
     def test_api_rejects_unknown_relationship(self):
-        payload = {**self.values, "employment_relationship": self.relationship.pk + 999}
-        response = self.client.post("/api/employment-conditions/", payload, format="json")
+        payload = {
+            **self.values,
+            "employment_relationship": self.relationship.pk + 999,
+        }
+        response = self.client.post(
+            "/api/employment-conditions/", payload, format="json"
+        )
         self.assertEqual(response.status_code, 400)
 
     def test_api_requires_staff_access(self):
@@ -110,10 +170,17 @@ class EmploymentRegistrationTests(TestCase):
         self.assertEqual(self.client.get("/api/employees/").status_code, 403)
 
     def test_api_rejects_duplicate_employee_code(self):
-        response = self.client.post("/api/employees/", {
-            "internal_code": "EMP-001", "first_name": "Other", "last_name": "Person",
-            "birth_date": "1991-01-01", "tax_id": "",
-        }, format="json")
+        response = self.client.post(
+            "/api/employees/",
+            {
+                "internal_code": "EMP-001",
+                "first_name": "Other",
+                "last_name": "Person",
+                "birth_date": "1991-01-01",
+                "tax_id": "",
+            },
+            format="json",
+        )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Employee.objects.count(), 1)
 
@@ -138,12 +205,15 @@ class EmploymentRegistrationTests(TestCase):
     def test_unknown_identification_type_is_rejected(self):
         response = self.client.patch(
             f"/api/employees/{self.employee.pk}/",
-            {"identification_type": "UNKNOWN"}, format="json",
+            {"identification_type": "UNKNOWN"},
+            format="json",
         )
         self.assertEqual(response.status_code, 400)
         self.assertIn("identification_type", response.data)
 
-    def test_retribution_api_round_trip_is_exact_and_partial_updates_preserve_it(self):
+    def test_retribution_api_round_trip_is_exact_and_partial_updates_preserve_it(
+        self,
+    ):
         payload = {
             **self.values,
             "employment_relationship": self.relationship.pk,
@@ -166,14 +236,19 @@ class EmploymentRegistrationTests(TestCase):
         self.assertEqual(condition.salary_amount_cents, 3000001)
         self.assertEqual(condition.withholding_rate_basis_points, 1937)
         for name in (
-            "salary_amount", "employee_insurance_exempt",
-            "employee_insurance_taxable", "family_insurance_exempt",
-            "family_insurance_taxable", "fixed_supplement", "withholding_rate",
+            "salary_amount",
+            "employee_insurance_exempt",
+            "employee_insurance_taxable",
+            "family_insurance_exempt",
+            "family_insurance_taxable",
+            "fixed_supplement",
+            "withholding_rate",
         ):
             self.assertEqual(response.data[name], payload[name])
         response = self.client.patch(
             f"/api/employment-conditions/{condition.pk}/",
-            {"job_title": "Responsable de administración"}, format="json",
+            {"job_title": "Responsable de administración"},
+            format="json",
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["salary_amount"], "30000.01")
@@ -214,22 +289,34 @@ class EmploymentRegistrationTests(TestCase):
         self.assertIsNone(condition.fixed_supplement_cents)
         response = self.client.patch(
             f"/api/employment-conditions/{condition.pk}/",
-            {"fixed_supplement": "0.00"}, format="json",
+            {"fixed_supplement": "0.00"},
+            format="json",
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["fixed_supplement"], "0.00")
         self.assertIsNone(response.data["employee_insurance_exempt"])
 
     def test_new_salary_period_does_not_overwrite_previous_salary(self):
-        first = create_record(EmploymentCondition, {
-            **self.values, "salary_amount_cents": 3000000,
-            "salary_period": "ANNUAL", "payments_per_year": 14,
-        })
-        create_record(EmploymentCondition, {
-            **self.values, "valid_from": date(2026, 7, 1),
-            "valid_until": None, "salary_amount_cents": 3300000,
-            "salary_period": "ANNUAL", "payments_per_year": 12,
-        })
+        first = create_record(
+            EmploymentCondition,
+            {
+                **self.values,
+                "salary_amount_cents": 3000000,
+                "salary_period": "ANNUAL",
+                "payments_per_year": 14,
+            },
+        )
+        create_record(
+            EmploymentCondition,
+            {
+                **self.values,
+                "valid_from": date(2026, 7, 1),
+                "valid_until": None,
+                "salary_amount_cents": 3300000,
+                "salary_period": "ANNUAL",
+                "payments_per_year": 12,
+            },
+        )
         first.refresh_from_db()
         self.assertEqual(first.salary_amount_cents, 3000000)
         self.assertEqual(first.payments_per_year, 14)
@@ -239,15 +326,20 @@ class EmploymentRegistrationTests(TestCase):
         from django.test import RequestFactory
 
         model_admin = admin.site._registry[EmploymentCondition]
-        request = RequestFactory().get("/admin/employees/employmentcondition/add/")
+        request = RequestFactory().get(
+            "/admin/employees/employmentcondition/add/"
+        )
         request.user = get_user_model().objects.create_superuser(
             username="admin-test", password="Test-only-strong-password-123"
         )
         form_class = model_admin.get_form(request)
         payload = {
-            **self.values, "employment_relationship": self.relationship.pk,
-            "salary_amount": "2500.01", "salary_period": "MONTHLY",
-            "payments_per_year": 14, "withholding_rate": "15.25",
+            **self.values,
+            "employment_relationship": self.relationship.pk,
+            "salary_amount": "2500.01",
+            "salary_period": "MONTHLY",
+            "payments_per_year": 14,
+            "withholding_rate": "15.25",
             "fixed_supplement": "10.10",
         }
         form = form_class(data=payload)

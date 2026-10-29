@@ -14,15 +14,21 @@ class Employee(models.Model):
         PASSPORT = "PASSPORT", "Pasaporte"
         OTHER = "OTHER", "Otro documento"
 
-    internal_code = models.CharField("código interno", max_length=50, unique=True)
+    internal_code = models.CharField(
+        "código interno", max_length=50, unique=True
+    )
     first_name = models.CharField("nombre", max_length=150)
     last_name = models.CharField("apellidos", max_length=150)
     birth_date = models.DateField("fecha de nacimiento")
     identification_type = models.CharField(
-        "tipo de identificación", max_length=20,
-        choices=IdentificationType.choices, blank=True,
+        "tipo de identificación",
+        max_length=20,
+        choices=IdentificationType.choices,
+        blank=True,
     )
-    tax_id = models.CharField("número de identificación", max_length=30, blank=True)
+    tax_id = models.CharField(
+        "número de identificación", max_length=30, blank=True
+    )
 
     class Meta:
         verbose_name = "trabajador"
@@ -34,7 +40,9 @@ class Employee(models.Model):
 
 class Company(models.Model):
     name = models.CharField("nombre", max_length=200)
-    tax_id = models.CharField("identificación fiscal", max_length=30, unique=True)
+    tax_id = models.CharField(
+        "identificación fiscal", max_length=30, unique=True
+    )
 
     class Meta:
         verbose_name = "empresa"
@@ -46,10 +54,14 @@ class Company(models.Model):
 
 class EmploymentRelationship(models.Model):
     employee = models.ForeignKey(
-        Employee, on_delete=models.PROTECT, related_name="employment_relationships"
+        Employee,
+        on_delete=models.PROTECT,
+        related_name="employment_relationships",
     )
     company = models.ForeignKey(
-        Company, on_delete=models.PROTECT, related_name="employment_relationships"
+        Company,
+        on_delete=models.PROTECT,
+        related_name="employment_relationships",
     )
     start_date = models.DateField("inicio")
     end_date = models.DateField("fin exclusivo", null=True, blank=True)
@@ -74,10 +86,13 @@ class EmploymentRelationship(models.Model):
                 raise ValidationError(
                     {"start_date": "Existen condiciones anteriores al inicio."}
                 )
-            if self.end_date and conditions.filter(
-                models.Q(valid_until__isnull=True)
-                | models.Q(valid_until__gt=self.end_date)
-            ).exists():
+            if (
+                self.end_date
+                and conditions.filter(
+                    models.Q(valid_until__isnull=True)
+                    | models.Q(valid_until__gt=self.end_date)
+                ).exists()
+            ):
                 raise ValidationError(
                     {"end_date": "Existen condiciones fuera de la relación."}
                 )
@@ -107,13 +122,19 @@ class EmploymentCondition(models.Model):
     )
 
     employment_relationship = models.ForeignKey(
-        EmploymentRelationship, on_delete=models.PROTECT, related_name="conditions"
+        EmploymentRelationship,
+        on_delete=models.PROTECT,
+        related_name="conditions",
     )
     valid_from = models.DateField("vigente desde")
-    valid_until = models.DateField("vigente hasta (excluido)", null=True, blank=True)
+    valid_until = models.DateField(
+        "vigente hasta (excluido)", null=True, blank=True
+    )
     contract_type = models.CharField("modalidad contractual", max_length=150)
     working_time_percentage = models.DecimalField(
-        "porcentaje de jornada", max_digits=5, decimal_places=2,
+        "porcentaje de jornada",
+        max_digits=5,
+        decimal_places=2,
         validators=[
             MinValueValidator(Decimal("0.01")),
             MaxValueValidator(Decimal("100")),
@@ -121,40 +142,61 @@ class EmploymentCondition(models.Model):
     )
     social_security_regime = models.CharField("régimen", max_length=150)
     collective_agreement = models.CharField("convenio", max_length=200)
-    job_title = models.CharField("puesto de trabajo", max_length=150, blank=True)
+    job_title = models.CharField(
+        "puesto de trabajo", max_length=150, blank=True
+    )
     salary_amount_cents = models.PositiveBigIntegerField(
-        "importe salarial (céntimos)", null=True, blank=True,
+        "importe salarial (céntimos)",
+        null=True,
+        blank=True,
         validators=[MaxValueValidator(999999999999)],
     )
     salary_period = models.CharField(
-        "unidad del salario", max_length=10, choices=SalaryPeriod.choices,
+        "unidad del salario",
+        max_length=10,
+        choices=SalaryPeriod.choices,
         blank=True,
     )
     payments_per_year = models.PositiveSmallIntegerField(
-        "número de pagas", choices=PaymentCount.choices, null=True, blank=True,
+        "número de pagas",
+        choices=PaymentCount.choices,
+        null=True,
+        blank=True,
     )
     employee_insurance_exempt_cents = models.PositiveBigIntegerField(
-        "seguro trabajador exento (céntimos)", null=True, blank=True,
+        "seguro trabajador exento (céntimos)",
+        null=True,
+        blank=True,
         validators=[MaxValueValidator(999999999999)],
     )
     employee_insurance_taxable_cents = models.PositiveBigIntegerField(
-        "seguro trabajador sujeto (céntimos)", null=True, blank=True,
+        "seguro trabajador sujeto (céntimos)",
+        null=True,
+        blank=True,
         validators=[MaxValueValidator(999999999999)],
     )
     family_insurance_exempt_cents = models.PositiveBigIntegerField(
-        "seguro familia exento (céntimos)", null=True, blank=True,
+        "seguro familia exento (céntimos)",
+        null=True,
+        blank=True,
         validators=[MaxValueValidator(999999999999)],
     )
     family_insurance_taxable_cents = models.PositiveBigIntegerField(
-        "seguro familia sujeto (céntimos)", null=True, blank=True,
+        "seguro familia sujeto (céntimos)",
+        null=True,
+        blank=True,
         validators=[MaxValueValidator(999999999999)],
     )
     fixed_supplement_cents = models.PositiveBigIntegerField(
-        "complemento fijo (céntimos)", null=True, blank=True,
+        "complemento fijo (céntimos)",
+        null=True,
+        blank=True,
         validators=[MaxValueValidator(999999999999)],
     )
     withholding_rate_basis_points = models.PositiveSmallIntegerField(
-        "IRPF (centésimas de porcentaje)", null=True, blank=True,
+        "IRPF (centésimas de porcentaje)",
+        null=True,
+        blank=True,
         validators=[MaxValueValidator(10000)],
     )
 
@@ -202,13 +244,15 @@ class EmploymentCondition(models.Model):
     def clean(self):
         super().clean()
         if self.salary_amount_cents is None and self.salary_period:
-            raise ValidationError({
-                "salary_period": "Indica también el importe del salario."
-            })
+            raise ValidationError(
+                {"salary_period": "Indica también el importe del salario."}
+            )
         if self.salary_amount_cents is not None:
             errors = {}
             if not self.salary_period:
-                errors["salary_period"] = "Indica si el importe es anual o mensual."
+                errors["salary_period"] = (
+                    "Indica si el importe es anual o mensual."
+                )
             if self.payments_per_year is None:
                 errors["payments_per_year"] = "Indica el número de pagas."
             if errors:
@@ -225,7 +269,8 @@ class EmploymentCondition(models.Model):
                 {"valid_from": "Anterior al inicio de la relación laboral."}
             )
         if relationship.end_date and (
-            self.valid_until is None or self.valid_until > relationship.end_date
+            self.valid_until is None
+            or self.valid_until > relationship.end_date
         ):
             raise ValidationError(
                 {"valid_until": "Debe quedar dentro de la relación laboral."}

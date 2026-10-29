@@ -1,7 +1,9 @@
 from rest_framework.routers import DefaultRouter
 
 from .views import (
-    CompanyViewSet, EmployeeViewSet, EmploymentConditionViewSet,
+    CompanyViewSet,
+    EmployeeViewSet,
+    EmploymentConditionViewSet,
     EmploymentRelationshipViewSet,
 )
 

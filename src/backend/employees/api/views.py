@@ -1,16 +1,26 @@
 from rest_framework import mixins, viewsets
 from rest_framework.permissions import IsAdminUser
 
-from ..models import Company, Employee, EmploymentCondition, EmploymentRelationship
+from ..models import (
+    Company,
+    Employee,
+    EmploymentCondition,
+    EmploymentRelationship,
+)
 from .serializers import (
-    CompanySerializer, EmployeeSerializer, EmploymentConditionSerializer,
+    CompanySerializer,
+    EmployeeSerializer,
+    EmploymentConditionSerializer,
     EmploymentRelationshipSerializer,
 )
 
 
 class RegistrationViewSet(
-    mixins.CreateModelMixin, mixins.ListModelMixin, mixins.RetrieveModelMixin,
-    mixins.UpdateModelMixin, viewsets.GenericViewSet,
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.UpdateModelMixin,
+    viewsets.GenericViewSet,
 ):
     permission_classes = [IsAdminUser]
 

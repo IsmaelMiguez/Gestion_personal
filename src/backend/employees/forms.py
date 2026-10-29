@@ -7,8 +7,11 @@ from .models import EmploymentCondition
 
 def euro_field(label):
     return forms.DecimalField(
-        label=label, max_digits=12, decimal_places=2,
-        min_value=Decimal("0"), required=False,
+        label=label,
+        max_digits=12,
+        decimal_places=2,
+        min_value=Decimal("0"),
+        required=False,
     )
 
 
@@ -22,8 +25,12 @@ class EmploymentConditionForm(forms.ModelForm):
     family_insurance_taxable = euro_field("Seguro familia sujeto (€/mes)")
     fixed_supplement = euro_field("Complemento fijo (€/mes)")
     withholding_rate = forms.DecimalField(
-        label="IRPF (%)", decimal_places=2, max_digits=5,
-        min_value=Decimal("0"), max_value=Decimal("100"), required=False,
+        label="IRPF (%)",
+        decimal_places=2,
+        max_digits=5,
+        min_value=Decimal("0"),
+        max_value=Decimal("100"),
+        required=False,
     )
 
     class Meta:
@@ -54,7 +61,8 @@ class EmploymentConditionForm(forms.ModelForm):
             if name in self.cleaned_data:
                 value = self.cleaned_data[name]
                 setattr(
-                    self.instance, storage_name,
+                    self.instance,
+                    storage_name,
                     int(value * 100) if value is not None else None,
                 )
         if "withholding_rate" in self.cleaned_data:
