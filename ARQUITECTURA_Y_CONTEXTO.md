@@ -1956,3 +1956,12 @@ El usuario solicita una interfaz menos plana, con secciones y contraste más có
 Se utilizan exclusivamente componentes/utilidades incluidos en Bootstrap 5.3.8 ya disponible localmente. No se añaden CSS propio, dependencias, modelos, migraciones ni reglas funcionales. La marca de navegación vuelve al inicio mediante enlace normal para mantener correcta la sección activa; búsqueda/paginación y envío de formularios conservan HTMX. El endpoint de inicio sigue admitiendo respuesta parcial. Los colores acompañan a títulos/numeración, sin ser el único indicador de sección.
 
 Verificación: los 40 tests existentes pasan; Ruff check, format --check y Django check sin incidencias. No se añaden pruebas que solo reflejen clases CSS. Pendiente revisión visual en el navegador del usuario; sin commits.
+
+
+## Anexo U. Edición de datos personales (02/11/2026)
+
+El usuario aprueba implementar la edición personal antes de abordar cambios de condiciones. Añadidos enlace Editar datos personales en la ficha y ruta /employees/<id>/edit/. Formulario Bootstrap con datos actuales, documento seleccionable, fechas nativas, errores junto a campos, guardado y cancelación. Reutiliza EmployeeForm y update_record; el formulario solo autoriza los campos de identidad existentes, incluido internal_code. No modifica el vínculo empleado/contrato ni retribuciones. El helper de errores de registro se renombra form_validation_errors para reutilizarlo en ambas operaciones.
+
+GET devuelve página completa o fragmento según HTMX; restauración de historial devuelve página completa. POST válido redirige a la ficha mediante redirect o HX-Redirect; errores conservan lo introducido y no escriben cambios. Permisos staff, CSRF, ausencia de caché e historial local desactivado conservados. No se añade auditoría/versionado de identidad todavía.
+
+Verificación: 47 tests correctos (40 anteriores y 7 de edición), que cubren formulario precargado, actualización exacta de identidad con contrato/condiciones intactos, rechazo de campos ajenos, errores HTMX sin escritura, código duplicado, redirección, permisos/CSRF, empleado inexistente y restauración de historial. Ruff check, format --check y Django check correctos; modelos/migraciones sin cambios. README actualizado. Pendiente revisión visual del usuario; sin commits ni cambios de la base de desarrollo.

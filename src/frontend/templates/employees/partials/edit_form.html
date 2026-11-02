@@ -1,0 +1,31 @@
+<section id="employee-edit-panel" aria-labelledby="employee-edit-title">
+  <a class="btn btn-light border btn-sm mb-4" href="{% url 'employees:detail' employee.pk %}">&larr; Volver a la ficha</a>
+  <div class="bg-primary-subtle border border-primary-subtle rounded-4 p-4 mb-4">
+    <p class="text-primary-emphasis small text-uppercase fw-semibold mb-1">Ficha del trabajador</p>
+    <h1 id="employee-edit-title" class="h2 fw-semibold">Editar datos personales</h1>
+    <p class="text-body-secondary mb-0">{{ employee.first_name }} {{ employee.last_name }} · {{ employee.internal_code }}</p>
+  </div>
+  <form method="post" action="{% url 'employees:edit' employee.pk %}"
+        hx-post="{% url 'employees:edit' employee.pk %}" hx-target="#employee-edit-panel"
+        hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']"
+        hx-sync="this:drop" novalidate>
+    {% csrf_token %}
+    {% if form.errors %}
+      <div class="alert alert-danger" role="alert">No se han guardado los cambios. Revisa los campos indicados.</div>
+    {% endif %}
+    <fieldset class="card border shadow-sm rounded-4 overflow-hidden mb-4">
+      <legend class="float-none w-100 h5 p-3 px-lg-4 m-0 bg-primary-subtle text-primary-emphasis border-bottom">Datos personales</legend>
+      <div class="card-body bg-body-tertiary p-4">
+        {% for error in form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endfor %}
+        <p class="form-text mt-0 mb-4">Los campos con * son obligatorios.</p>
+        <div class="row">
+          {% for field in form %}{% include "employees/partials/form_field.html" with field=field only %}{% endfor %}
+        </div>
+      </div>
+    </fieldset>
+    <div class="d-flex gap-2 flex-wrap bg-white border rounded-4 p-4 shadow-sm">
+      <button class="btn btn-primary px-4" type="submit">Guardar cambios</button>
+      <a class="btn btn-outline-secondary" href="{% url 'employees:detail' employee.pk %}">Cancelar</a>
+    </div>
+  </form>
+</section>

@@ -11,8 +11,9 @@
   </div>
 </div>
 <section class="card border shadow-sm rounded-4 overflow-hidden mb-4" aria-labelledby="personal-data-title">
-  <div class="card-header bg-white border-bottom p-3 px-lg-4">
+  <div class="card-header bg-white border-bottom p-3 px-lg-4 d-flex align-items-center justify-content-between gap-3 flex-wrap">
     <h2 id="personal-data-title" class="h5 mb-0">Datos personales</h2>
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'employees:edit' employee.pk %}">Editar datos personales</a>
   </div>
   <div class="card-body bg-body-tertiary p-4">
     <dl class="row mb-0">

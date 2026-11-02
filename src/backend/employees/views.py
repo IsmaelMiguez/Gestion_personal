@@ -23,7 +23,7 @@ from .models import (
     EmploymentCondition,
     EmploymentRelationship,
 )
-from .services import register_employee
+from .services import register_employee, update_record
 
 
 @require_GET
@@ -152,7 +152,7 @@ def employee_detail(request, pk):
     )
 
 
-def registration_errors(forms, error):
+def form_validation_errors(forms, error):
     """Attach model validation errors to their visible form fields."""
     field_errors = (
         error.message_dict
@@ -200,7 +200,7 @@ def employee_registration(request):
                     condition_form.save(commit=False),
                 )
             except ValidationError as error:
-                registration_errors(forms, error)
+                form_validation_errors(forms, error)
             else:
                 destination = reverse("employees:detail", args=[employee.pk])
                 if request.htmx:
@@ -224,3 +224,32 @@ def employee_registration(request):
             "has_companies": Company.objects.exists(),
         },
     )
+
+
+@never_cache
+@vary_on_headers("HX-Request", "HX-History-Restore-Request")
+@staff_required
+@require_http_methods(["GET", "POST"])
+def employee_edit(request, pk):
+    employee = get_object_or_404(Employee, pk=pk)
+    form = EmployeeForm(
+        data=request.POST if request.method == "POST" else None,
+        instance=employee,
+        prefix="employee",
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            employee = update_record(employee, form.cleaned_data)
+        except ValidationError as error:
+            form_validation_errors((form,), error)
+        else:
+            destination = reverse("employees:detail", args=[employee.pk])
+            if request.htmx:
+                return HttpResponseClientRedirect(destination)
+            return redirect(destination)
+    template = (
+        "employees/partials/edit_form.html"
+        if request.htmx and not request.htmx.history_restore_request
+        else "employees/edit.html"
+    )
+    return render(request, template, {"employee": employee, "form": form})

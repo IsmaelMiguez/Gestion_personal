@@ -28,8 +28,8 @@
           <a class="nav-link px-3 rounded {% if request.resolver_match.url_name == 'home' %}active bg-primary{% endif %}"
              {% if request.resolver_match.url_name == 'home' %}aria-current="page"{% endif %}
              href="{% url 'employees:home' %}">Inicio</a>
-          <a class="nav-link px-3 rounded {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' %}active bg-primary{% endif %}"
-             {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' %}aria-current="page"{% endif %}
+          <a class="nav-link px-3 rounded {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'edit' %}active bg-primary{% endif %}"
+             {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'edit' %}aria-current="page"{% endif %}
              href="{% url 'employees:list' %}">Empleados</a>
           <a class="nav-link px-3 rounded {% if request.resolver_match.url_name == 'register' %}active bg-primary{% endif %}"
              {% if request.resolver_match.url_name == 'register' %}aria-current="page"{% endif %}
