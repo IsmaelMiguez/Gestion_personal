@@ -1,4 +1,4 @@
-<div class="col-md-6 mb-3">
+<div class="{{ column_class|default:'col-md-6' }} mb-3">
   <label class="form-label fw-semibold small" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="text-primary" aria-hidden="true">*</span><span class="visually-hidden"> (obligatorio)</span>{% endif %}</label>
   {{ field }}
   {% if field.help_text %}<div class="form-text" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}

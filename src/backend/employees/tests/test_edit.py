@@ -4,13 +4,13 @@ from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from .models import (
+from ..models import (
     Company,
     Employee,
     EmploymentCondition,
     EmploymentRelationship,
 )
-from .services import create_record
+from ..services import create_record
 
 
 class EmployeeEditTests(TestCase):

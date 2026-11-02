@@ -1,6 +1,6 @@
-{% extends "base.html" %}
+{% extends "pages/payroll/base.html" %}
 {% block title %}{{ employee.first_name }} {{ employee.last_name }} · RRHH Tool{% endblock %}
-{% block content %}
+{% block payroll_content %}
 <a href="{% url 'employees:list' %}" class="btn btn-light border btn-sm mb-4">&larr; Volver a empleados</a>
 <div class="bg-primary-subtle border border-primary-subtle rounded-4 p-4 mb-4 d-flex align-items-center gap-3 flex-wrap">
   <span class="badge text-bg-primary rounded-4 p-4 fs-3" aria-hidden="true">{{ employee.first_name|slice:":1"|upper }}{{ employee.last_name|slice:":1"|upper }}</span>

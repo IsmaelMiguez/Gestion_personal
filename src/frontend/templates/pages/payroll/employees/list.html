@@ -1,6 +1,6 @@
-{% extends "base.html" %}
+{% extends "pages/payroll/base.html" %}
 {% block title %}Empleados · RRHH Tool{% endblock %}
-{% block content %}
+{% block payroll_content %}
 <section aria-labelledby="employee-list-title">
   <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4 p-4 rounded-4 bg-primary-subtle border border-primary-subtle">
     <div>
@@ -23,6 +23,6 @@
     </div>
     <span id="search-progress" class="htmx-indicator text-body-secondary small mt-2" role="status">Buscando…</span>
   </form>
-  {% include "employees/partials/employee_results.html" %}
+  {% include "pages/payroll/employees/partials/employee_results.html" %}
 </section>
 {% endblock %}

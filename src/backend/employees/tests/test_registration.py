@@ -5,13 +5,13 @@ from django.core.exceptions import ValidationError
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from .models import (
+from ..models import (
     Company,
     Employee,
     EmploymentCondition,
     EmploymentRelationship,
 )
-from .services import create_record, register_employee
+from ..services import create_record, register_employee
 
 
 class EmployeeRegistrationTests(TestCase):

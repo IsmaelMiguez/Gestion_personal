@@ -1965,3 +1965,28 @@ El usuario aprueba implementar la edición personal antes de abordar cambios de 
 GET devuelve página completa o fragmento según HTMX; restauración de historial devuelve página completa. POST válido redirige a la ficha mediante redirect o HX-Redirect; errores conservan lo introducido y no escriben cambios. Permisos staff, CSRF, ausencia de caché e historial local desactivado conservados. No se añade auditoría/versionado de identidad todavía.
 
 Verificación: 47 tests correctos (40 anteriores y 7 de edición), que cubren formulario precargado, actualización exacta de identidad con contrato/condiciones intactos, rechazo de campos ajenos, errores HTMX sin escritura, código duplicado, redirección, permisos/CSRF, empleado inexistente y restauración de historial. Ruff check, format --check y Django check correctos; modelos/migraciones sin cambios. README actualizado. Pendiente revisión visual del usuario; sin commits ni cambios de la base de desarrollo.
+
+
+## Anexo V. Páginas independientes y acceso propio (02/11/2026)
+
+El usuario solicita reorganizar el frontend por páginas para permitir secciones ajenas a nóminas y añadir login. Se implementa la estructura solicitada, manteniendo modelos/servicios existentes y sin nuevas dependencias o migraciones.
+
+- base.html conserva únicamente marco global, recursos locales, navegación de secciones y pie; no es una vista ni tiene URL propia.
+- src/frontend/pages contiene rutas, vistas de entrada/login/documentos, formulario de autenticación y comprobación de acceso compartida. Es un paquete Python de presentación sin modelos ni nueva app de base de datos.
+- templates/pages/login/index.html: login con las cuentas existentes de Django. LoginView y AuthenticationForm gestionan sesión y redirecciones seguras. Se exige usuario activo staff, como en el acceso previo; no se crean cuentas ni cambian permisos. Login normal completo; si recibe un envío HTMX válido redirige a documento completo.
+- templates/pages/payroll: base de sección, index y partials/overview.html; las pantallas de empleados y sus fragmentos se trasladan a employees/. La navegación de Nóminas queda separada de la global.
+- templates/pages/documents/index.html: página protegida de sección futura, sin operaciones de archivos, modelos o integración SharePoint. Solo indica disponibilidad posterior.
+- components/form_field.html se comparte entre las páginas; las vistas de empleados conservan sus validaciones/servicios y usan el control de acceso común, ya independiente del administrador.
+
+Rutas vigentes: / redirige a /login/ sin sesión y a /payroll/ con sesión; /login/ acceso; /logout/ cierre por POST; /payroll/ sección Nóminas; /payroll/employees/ y subrutas para el flujo de empleados; /documents/ espacio futuro. Los nombres employees:* se conservan para resolver enlaces. Las rutas previas /employees/ dejan de ser las rutas de las pantallas; no se mantienen copias de vistas ni alias. API /api/ y administrador /admin/ sin cambios. El usuario ya conectado puede cerrar sesión para probar la pantalla de acceso.
+
+Se mantienen Bootstrap local, HTMX, no-cache de páginas personales, CSRF y rechazo de usuarios sin acceso. El siguiente destino del login se valida con las herramientas nativas de Django para impedir redirecciones externas. Logout por GET no cierra la sesión. La dependencia de las futuras páginas documentales con nóminas se limita a la navegación global compartida.
+
+Verificación: 59 tests correctos ejecutados con `test backend.employees frontend.pages`, incluidos los flujos anteriores adaptados a las rutas/plantillas y nuevas pruebas de login, contraseña errónea, cuentas inactivas/no staff, next interno/externo, logout/CSRF, sesión HTMX caducada y separación de secciones. Ruff y Django check correctos, sin cambios de esquema. README actualizado con árbol y rutas. Pendiente revisión visual por el usuario; sin commits.
+
+
+## Anexo W. Organización de pruebas de empleados (02/11/2026)
+
+A petición del usuario se agrupan los tests de backend.employees en un paquete tests/ con __init__.py vacío. tests.py se divide en test_backend.py (validaciones, servicios, API y formulario admin) y test_shell.py (estructura visual/estáticos). Los módulos dispersos se trasladan a test_pages.py, test_registration.py y test_edit.py dentro de la misma carpeta. Se ajustan los imports relativos; no se modifica la lógica ni se duplican clases de prueba.
+
+El comando `test backend.employees frontend.pages` sigue descubriendo las 59 pruebas, todas correctas. Se mantiene la comprobación de Ruff/formato y Django check. Sin cambios funcionales, migraciones ni commits.

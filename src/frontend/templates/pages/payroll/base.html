@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block footer_context %}Simulación y comprobación de nóminas{% endblock %}
+{% block content %}
+  <nav class="nav nav-pills gap-2 bg-white border rounded-4 p-2 shadow-sm mb-4" aria-label="Navegación de Nóminas">
+    <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
+       {% if request.resolver_match.url_name == 'home' %}aria-current="page"{% endif %}
+       href="{% url 'employees:home' %}">Resumen</a>
+    <a class="nav-link {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'edit' %}active{% endif %}"
+       {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'edit' %}aria-current="page"{% endif %}
+       href="{% url 'employees:list' %}">Empleados</a>
+    <a class="nav-link {% if request.resolver_match.url_name == 'register' %}active{% endif %}"
+       {% if request.resolver_match.url_name == 'register' %}aria-current="page"{% endif %}
+       href="{% url 'employees:register' %}">Registrar empleado</a>
+  </nav>
+  <div id="payroll-content">
+    {% block payroll_content %}{% endblock %}
+  </div>
+{% endblock %}

@@ -1,7 +1,4 @@
-from functools import wraps
-from urllib.parse import urlencode
-
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404, redirect, render
@@ -10,6 +7,8 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_GET, require_http_methods
 from django.views.decorators.vary import vary_on_headers
 from django_htmx.http import HttpResponseClientRedirect
+
+from frontend.pages.access import staff_required
 
 from .forms import (
     EmployeeForm,
@@ -26,40 +25,17 @@ from .models import (
 from .services import register_employee, update_record
 
 
+@never_cache
+@vary_on_headers("HX-Request", "HX-History-Restore-Request")
+@staff_required
 @require_GET
-@vary_on_headers("HX-Request")
 def home(request):
     template = (
-        "employees/partials/home_content.html"
-        if request.htmx
-        else "employees/home.html"
+        "pages/payroll/partials/overview.html"
+        if request.htmx and not request.htmx.history_restore_request
+        else "pages/payroll/index.html"
     )
     return render(request, template)
-
-
-def staff_required(view):
-    """Keep personal data restricted, including HTMX session expiry."""
-
-    @wraps(view)
-    def wrapped(request, *args, **kwargs):
-        if not request.user.is_authenticated:
-            login_url = (
-                reverse("admin:login")
-                + "?"
-                + urlencode(
-                    {
-                        "next": request.path,
-                    }
-                )
-            )
-            if request.htmx:
-                return HttpResponseClientRedirect(login_url)
-            return redirect(login_url)
-        if not request.user.is_active or not request.user.is_staff:
-            raise PermissionDenied
-        return view(request, *args, **kwargs)
-
-    return wrapped
 
 
 @never_cache
@@ -78,9 +54,9 @@ def employee_list(request):
         )
     page = Paginator(employees, 20).get_page(request.GET.get("page"))
     template = (
-        "employees/partials/employee_results.html"
+        "pages/payroll/employees/partials/employee_results.html"
         if request.htmx and not request.htmx.history_restore_request
-        else "employees/list.html"
+        else "pages/payroll/employees/list.html"
     )
     return render(request, template, {"page": page, "query": query})
 
@@ -144,7 +120,7 @@ def employee_detail(request, pk):
     ]
     return render(
         request,
-        "employees/detail.html",
+        "pages/payroll/employees/detail.html",
         {
             "employee": employee,
             "contracts": contracts,
@@ -207,9 +183,9 @@ def employee_registration(request):
                     return HttpResponseClientRedirect(destination)
                 return redirect(destination)
     template = (
-        "employees/partials/registration_form.html"
+        "pages/payroll/employees/partials/registration_form.html"
         if request.htmx and not request.htmx.history_restore_request
-        else "employees/registration.html"
+        else "pages/payroll/employees/registration.html"
     )
     return render(
         request,
@@ -248,8 +224,8 @@ def employee_edit(request, pk):
                 return HttpResponseClientRedirect(destination)
             return redirect(destination)
     template = (
-        "employees/partials/edit_form.html"
+        "pages/payroll/employees/partials/edit_form.html"
         if request.htmx and not request.htmx.history_restore_request
-        else "employees/edit.html"
+        else "pages/payroll/employees/edit.html"
     )
     return render(request, template, {"employee": employee, "form": form})

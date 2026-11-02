@@ -14,29 +14,36 @@
       hx-headers='{"x-csrftoken": "{{ csrf_token }}"}'>
   <a class="visually-hidden-focusable p-3 bg-white" href="#main-content">Saltar al contenido</a>
   <header class="bg-dark border-bottom border-primary border-3 shadow-sm" data-bs-theme="dark">
-    <nav class="navbar navbar-expand-lg container py-3" aria-label="Navegación principal">
-      <a class="navbar-brand d-flex align-items-center gap-2 fw-semibold" href="{% url 'employees:home' %}">
+    <nav class="navbar navbar-expand-lg container py-3" aria-label="Secciones de la aplicación">
+      <a class="navbar-brand d-flex align-items-center gap-2 fw-semibold" href="{% url 'pages:entry' %}">
         <span class="badge text-bg-primary rounded-3 p-2" aria-hidden="true">RH</span>
         RRHH Tool
       </a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-navigation"
-              aria-controls="main-navigation" aria-expanded="false" aria-label="Mostrar navegación">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="main-navigation">
-        <div class="navbar-nav gap-lg-2 ms-lg-4 py-3 py-lg-0">
-          <a class="nav-link px-3 rounded {% if request.resolver_match.url_name == 'home' %}active bg-primary{% endif %}"
-             {% if request.resolver_match.url_name == 'home' %}aria-current="page"{% endif %}
-             href="{% url 'employees:home' %}">Inicio</a>
-          <a class="nav-link px-3 rounded {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'edit' %}active bg-primary{% endif %}"
-             {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'edit' %}aria-current="page"{% endif %}
-             href="{% url 'employees:list' %}">Empleados</a>
-          <a class="nav-link px-3 rounded {% if request.resolver_match.url_name == 'register' %}active bg-primary{% endif %}"
-             {% if request.resolver_match.url_name == 'register' %}aria-current="page"{% endif %}
-             href="{% url 'employees:register' %}">Registrar empleado</a>
+      {% if request.user.is_authenticated %}
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-navigation"
+                aria-controls="main-navigation" aria-expanded="false" aria-label="Mostrar navegación">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="main-navigation">
+          {% if request.user.is_staff %}
+            <div class="navbar-nav gap-lg-2 ms-lg-4 py-3 py-lg-0">
+              <a class="nav-link px-3 rounded {% if request.resolver_match.app_name == 'employees' %}active bg-primary{% endif %}"
+                 {% if request.resolver_match.app_name == 'employees' %}aria-current="page"{% endif %}
+                 href="{% url 'employees:home' %}">Nóminas</a>
+              <a class="nav-link px-3 rounded {% if request.resolver_match.url_name == 'documents' %}active bg-primary{% endif %}"
+                 {% if request.resolver_match.url_name == 'documents' %}aria-current="page"{% endif %}
+                 href="{% url 'pages:documents' %}">Gestión documental</a>
+            </div>
+          {% endif %}
+          <div class="d-flex gap-2 flex-wrap align-items-center ms-lg-auto">
+            {% if request.user.is_staff %}<a class="btn btn-outline-light btn-sm" href="{% url 'admin:index' %}">Administración</a>{% endif %}
+            <form method="post" action="{% url 'pages:logout' %}" class="m-0">
+              {% csrf_token %}
+              <button class="btn btn-light btn-sm" type="submit">Cerrar sesión</button>
+            </form>
+          </div>
         </div>
-        <a class="btn btn-outline-light btn-sm ms-lg-auto" href="{% url 'admin:index' %}">Administración</a>
-      </div>
+      {% endif %}
     </nav>
   </header>
   <main id="main-content" class="container py-4 py-lg-5 flex-grow-1" tabindex="-1">
@@ -45,7 +52,7 @@
   <footer class="bg-dark text-white-50">
     <div class="container py-3 d-flex justify-content-between gap-2 flex-wrap small">
       <span>RRHH Tool · Gestión de personal</span>
-      <span>Simulación y comprobación de nóminas</span>
+      <span>{% block footer_context %}Tu espacio de trabajo{% endblock %}</span>
     </div>
   </footer>
 </body>

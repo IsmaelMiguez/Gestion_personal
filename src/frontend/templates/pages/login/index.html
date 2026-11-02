@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Acceso · RRHH Tool{% endblock %}
+{% block content %}
+<div class="row justify-content-center py-lg-4">
+  <div class="col-lg-10 col-xl-9">
+    <div class="card border-0 rounded-4 shadow-sm overflow-hidden">
+      <div class="row g-0">
+        <div class="col-md-5 bg-dark bg-gradient text-white p-4 p-lg-5">
+          <span class="badge text-bg-primary rounded-pill mb-4">RRHH Tool</span>
+          <h1 class="h2 fw-semibold mb-3">Tu espacio de gestión</h1>
+          <p class="text-white-50 mb-0">Accede a Nóminas y a las herramientas de gestión de personal desde un mismo lugar.</p>
+        </div>
+        <div class="col-md-7 p-4 p-lg-5">
+          <h2 class="h4 mb-2">Iniciar sesión</h2>
+          <p class="text-body-secondary mb-4">Introduce tu usuario y contraseña.</p>
+          <form method="post" action="{% url 'pages:login' %}" novalidate>
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ next }}">
+            {% for error in form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endfor %}
+            <div class="row">
+              {% for field in form %}{% include "components/form_field.html" with field=field column_class="col-12" only %}{% endfor %}
+            </div>
+            <button class="btn btn-primary btn-lg w-100 mt-2" type="submit">Entrar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

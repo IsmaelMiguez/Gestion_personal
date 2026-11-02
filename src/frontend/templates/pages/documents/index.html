@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Gestión documental · RRHH Tool{% endblock %}
+{% block content %}
+<section class="card border shadow-sm rounded-4 overflow-hidden" aria-labelledby="documents-title">
+  <div class="card-header bg-dark text-white p-4">
+    <span class="badge text-bg-secondary mb-3">Próximamente</span>
+    <h1 id="documents-title" class="h2 mb-0">Gestión documental</h1>
+  </div>
+  <div class="card-body p-4">
+    <p class="text-body-secondary">Este espacio estará dedicado a la documentación. Sus funciones estarán disponibles más adelante.</p>
+    <a class="btn btn-outline-primary" href="{% url 'employees:home' %}">Ir a Nóminas</a>
+  </div>
+</section>
+{% endblock %}

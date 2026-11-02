@@ -4,13 +4,13 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import (
+from ..models import (
     Company,
     Employee,
     EmploymentCondition,
     EmploymentRelationship,
 )
-from .services import create_record
+from ..services import create_record
 
 
 class EmployeePageTests(TestCase):
@@ -36,7 +36,7 @@ class EmployeePageTests(TestCase):
     def test_staff_can_read_list_and_search_across_name_fields(self):
         response = self.client.get(self.list_url, {"q": "alex example"})
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "employees/list.html")
+        self.assertTemplateUsed(response, "pages/payroll/employees/list.html")
         self.assertContains(response, self.detail_url)
         self.assertContains(response, "Alex Example")
         self.assertIn("no-store", response.headers["Cache-Control"])
@@ -156,7 +156,7 @@ class EmployeePageTests(TestCase):
         self.client.logout()
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, 302)
-        self.assertTrue(response.url.startswith(reverse("admin:login")))
+        self.assertTrue(response.url.startswith(reverse("pages:login")))
         response = self.client.get(self.list_url, HTTP_HX_REQUEST="true")
         self.assertEqual(response.status_code, 200)
         self.assertIn("HX-Redirect", response.headers)
@@ -180,3 +180,13 @@ class EmployeePageTests(TestCase):
         response = self.client.get(self.detail_url)
         self.assertContains(response, "&lt;script&gt;")
         self.assertNotContains(response, "<script>alert(1)</script>")
+
+    def test_payroll_home_supports_complete_and_partial_navigation(self):
+        url = reverse("employees:home")
+        response = self.client.get(url)
+        self.assertEqual(url, "/payroll/")
+        self.assertTemplateUsed(response, "pages/payroll/index.html")
+        response = self.client.get(url, HTTP_HX_REQUEST="true")
+        self.assertContains(response, 'id="home-title"')
+        self.assertNotContains(response, "<!doctype html>")
+        self.assertIn("HX-Request", response.headers["Vary"])

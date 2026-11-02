@@ -35,7 +35,7 @@
       <div class="card-body bg-body-tertiary p-4">
       {% for error in employee_form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
       <div class="row">
-        {% for field in employee_form %}{% include "employees/partials/form_field.html" with field=field only %}{% endfor %}
+        {% for field in employee_form %}{% include "components/form_field.html" with field=field only %}{% endfor %}
       </div>
       </div>
     </fieldset>
@@ -47,7 +47,7 @@
       <div class="card-body bg-body-tertiary p-4">
       {% for error in relationship_form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
       <div class="row">
-        {% for field in relationship_form %}{% include "employees/partials/form_field.html" with field=field only %}{% endfor %}
+        {% for field in relationship_form %}{% include "components/form_field.html" with field=field only %}{% endfor %}
       </div>
       <p class="form-text mb-0">Las fechas de fin son opcionales y excluyen ese día del periodo. La fecha de antigüedad puede ser anterior al inicio del contrato.</p>
       </div>
@@ -60,13 +60,13 @@
       <div class="card-body bg-body-tertiary p-4">
       {% for error in condition_form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
       <div class="row">
-        {% include "employees/partials/form_field.html" with field=condition_form.job_title only %}
-        {% include "employees/partials/form_field.html" with field=condition_form.contract_type only %}
-        {% include "employees/partials/form_field.html" with field=condition_form.working_time_percentage only %}
-        {% include "employees/partials/form_field.html" with field=condition_form.social_security_regime only %}
-        {% include "employees/partials/form_field.html" with field=condition_form.collective_agreement only %}
-        {% include "employees/partials/form_field.html" with field=condition_form.valid_from only %}
-        {% include "employees/partials/form_field.html" with field=condition_form.valid_until only %}
+        {% include "components/form_field.html" with field=condition_form.job_title only %}
+        {% include "components/form_field.html" with field=condition_form.contract_type only %}
+        {% include "components/form_field.html" with field=condition_form.working_time_percentage only %}
+        {% include "components/form_field.html" with field=condition_form.social_security_regime only %}
+        {% include "components/form_field.html" with field=condition_form.collective_agreement only %}
+        {% include "components/form_field.html" with field=condition_form.valid_from only %}
+        {% include "components/form_field.html" with field=condition_form.valid_until only %}
       </div>
       </div>
     </fieldset>
@@ -77,11 +77,11 @@
       </legend>
       <div class="card-body bg-body-tertiary p-4">
       <div class="row">
-        {% include "employees/partials/form_field.html" with field=condition_form.salary_amount only %}
-        {% include "employees/partials/form_field.html" with field=condition_form.salary_period only %}
-        {% include "employees/partials/form_field.html" with field=condition_form.payments_per_year only %}
-        {% include "employees/partials/form_field.html" with field=condition_form.fixed_supplement only %}
-        {% include "employees/partials/form_field.html" with field=condition_form.withholding_rate only %}
+        {% include "components/form_field.html" with field=condition_form.salary_amount only %}
+        {% include "components/form_field.html" with field=condition_form.salary_period only %}
+        {% include "components/form_field.html" with field=condition_form.payments_per_year only %}
+        {% include "components/form_field.html" with field=condition_form.fixed_supplement only %}
+        {% include "components/form_field.html" with field=condition_form.withholding_rate only %}
       </div>
       <p class="form-text mb-0">Introduce los importes en euros. Un campo vacío significa que el dato no está informado; utiliza 0 cuando corresponda un importe cero.</p>
       </div>
@@ -93,10 +93,10 @@
       </legend>
       <div class="card-body bg-body-tertiary p-4">
       <div class="row">
-        {% include "employees/partials/form_field.html" with field=condition_form.employee_insurance_exempt only %}
-        {% include "employees/partials/form_field.html" with field=condition_form.employee_insurance_taxable only %}
-        {% include "employees/partials/form_field.html" with field=condition_form.family_insurance_exempt only %}
-        {% include "employees/partials/form_field.html" with field=condition_form.family_insurance_taxable only %}
+        {% include "components/form_field.html" with field=condition_form.employee_insurance_exempt only %}
+        {% include "components/form_field.html" with field=condition_form.employee_insurance_taxable only %}
+        {% include "components/form_field.html" with field=condition_form.family_insurance_exempt only %}
+        {% include "components/form_field.html" with field=condition_form.family_insurance_taxable only %}
       </div>
       </div>
     </fieldset>
