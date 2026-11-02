@@ -16,3 +16,6 @@ src/db.sqlite3
 src/db.sqlite3-journal
 src/db.sqlite3-wal
 src/db.sqlite3-shm
+
+# Dependencias locales del frontend
+node_modules/

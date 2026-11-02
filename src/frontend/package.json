@@ -1,0 +1,11 @@
+{
+  "name": "rrhh-tool-frontend",
+  "private": true,
+  "packageManager": "pnpm@12.16.1",
+  "scripts": {
+    "prepare:static": "node scripts/prepare-static.mjs"
+  },
+  "dependencies": {
+    "bootstrap": "5.3.8"
+  }
+}

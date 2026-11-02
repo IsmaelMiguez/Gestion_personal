@@ -1,0 +1,52 @@
+{% load static django_htmx %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}RRHH Tool{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap/bootstrap.min.css' %}">
+  <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}" defer></script>
+  {% htmx_script version=2 %}
+</head>
+<body class="bg-secondary-subtle d-flex flex-column min-vh-100"
+      hx-history="false"
+      hx-headers='{"x-csrftoken": "{{ csrf_token }}"}'>
+  <a class="visually-hidden-focusable p-3 bg-white" href="#main-content">Saltar al contenido</a>
+  <header class="bg-dark border-bottom border-primary border-3 shadow-sm" data-bs-theme="dark">
+    <nav class="navbar navbar-expand-lg container py-3" aria-label="Navegación principal">
+      <a class="navbar-brand d-flex align-items-center gap-2 fw-semibold" href="{% url 'employees:home' %}">
+        <span class="badge text-bg-primary rounded-3 p-2" aria-hidden="true">RH</span>
+        RRHH Tool
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-navigation"
+              aria-controls="main-navigation" aria-expanded="false" aria-label="Mostrar navegación">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="main-navigation">
+        <div class="navbar-nav gap-lg-2 ms-lg-4 py-3 py-lg-0">
+          <a class="nav-link px-3 rounded {% if request.resolver_match.url_name == 'home' %}active bg-primary{% endif %}"
+             {% if request.resolver_match.url_name == 'home' %}aria-current="page"{% endif %}
+             href="{% url 'employees:home' %}">Inicio</a>
+          <a class="nav-link px-3 rounded {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' %}active bg-primary{% endif %}"
+             {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' %}aria-current="page"{% endif %}
+             href="{% url 'employees:list' %}">Empleados</a>
+          <a class="nav-link px-3 rounded {% if request.resolver_match.url_name == 'register' %}active bg-primary{% endif %}"
+             {% if request.resolver_match.url_name == 'register' %}aria-current="page"{% endif %}
+             href="{% url 'employees:register' %}">Registrar empleado</a>
+        </div>
+        <a class="btn btn-outline-light btn-sm ms-lg-auto" href="{% url 'admin:index' %}">Administración</a>
+      </div>
+    </nav>
+  </header>
+  <main id="main-content" class="container py-4 py-lg-5 flex-grow-1" tabindex="-1">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="bg-dark text-white-50">
+    <div class="container py-3 d-flex justify-content-between gap-2 flex-wrap small">
+      <span>RRHH Tool · Gestión de personal</span>
+      <span>Simulación y comprobación de nóminas</span>
+    </div>
+  </footer>
+</body>
+</html>

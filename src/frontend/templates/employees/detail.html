@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ employee.first_name }} {{ employee.last_name }} · RRHH Tool{% endblock %}
+{% block content %}
+<a href="{% url 'employees:list' %}" class="btn btn-light border btn-sm mb-4">&larr; Volver a empleados</a>
+<div class="bg-primary-subtle border border-primary-subtle rounded-4 p-4 mb-4 d-flex align-items-center gap-3 flex-wrap">
+  <span class="badge text-bg-primary rounded-4 p-4 fs-3" aria-hidden="true">{{ employee.first_name|slice:":1"|upper }}{{ employee.last_name|slice:":1"|upper }}</span>
+  <div>
+    <p class="text-primary-emphasis small text-uppercase fw-semibold mb-1">Ficha del trabajador</p>
+    <h1 class="h2 fw-semibold mb-2">{{ employee.first_name }} {{ employee.last_name }}</h1>
+    <span class="badge bg-white text-primary-emphasis border">{{ employee.internal_code }}</span>
+  </div>
+</div>
+<section class="card border shadow-sm rounded-4 overflow-hidden mb-4" aria-labelledby="personal-data-title">
+  <div class="card-header bg-white border-bottom p-3 px-lg-4">
+    <h2 id="personal-data-title" class="h5 mb-0">Datos personales</h2>
+  </div>
+  <div class="card-body bg-body-tertiary p-4">
+    <dl class="row mb-0">
+      <dt class="col-sm-4 text-body-secondary fw-normal">Código interno</dt><dd class="col-sm-8 fw-semibold">{{ employee.internal_code }}</dd>
+      <dt class="col-sm-4 text-body-secondary fw-normal">Fecha de nacimiento</dt><dd class="col-sm-8">{{ employee.birth_date|date:"d/m/Y" }}</dd>
+      <dt class="col-sm-4 text-body-secondary fw-normal">Documento</dt><dd class="col-sm-8">{{ employee.get_identification_type_display }} {{ employee.tax_id|default:"Sin informar" }}</dd>
+    </dl>
+  </div>
+</section>
+<div class="d-flex align-items-center gap-2 mb-3">
+  <h2 class="h4 mb-0">Relaciones laborales</h2>
+  <span class="badge bg-white text-dark border rounded-pill">{{ contracts|length }}</span>
+</div>
+{% for contract in contracts %}
+  <section class="card border shadow-sm rounded-4 overflow-hidden mb-4" aria-labelledby="contract-{{ contract.relationship.pk }}">
+    <div class="card-header bg-dark text-white p-4 d-flex align-items-center justify-content-between gap-3 flex-wrap">
+      <h3 id="contract-{{ contract.relationship.pk }}" class="h5 mb-0">{{ contract.relationship.company.name }}</h3>
+      <span class="badge bg-white text-dark">Relación laboral {{ forloop.counter }}</span>
+    </div>
+    <div class="card-body bg-body-tertiary p-4">
+      <div class="row g-3 mb-4">
+        <div class="col-md-4"><div class="bg-white border rounded-3 p-3 h-100"><p class="text-body-secondary small mb-1">Inicio del contrato</p><p class="fw-semibold mb-0">{{ contract.relationship.start_date|date:"d/m/Y" }}</p></div></div>
+        <div class="col-md-4"><div class="bg-white border rounded-3 p-3 h-100"><p class="text-body-secondary small mb-1">Fin (excluido)</p><p class="fw-semibold mb-0">{{ contract.relationship.end_date|date:"d/m/Y"|default:"Sin fecha de fin" }}</p></div></div>
+        <div class="col-md-4"><div class="bg-white border rounded-3 p-3 h-100"><p class="text-body-secondary small mb-1">Antigüedad reconocida</p><p class="fw-semibold mb-0">{{ contract.relationship.seniority_date|date:"d/m/Y" }}</p></div></div>
+      </div>
+      <h4 class="h6 text-body-secondary mb-3">Histórico de condiciones</h4>
+      {% for item in contract.conditions %}
+        <div class="card border rounded-3 overflow-hidden mb-3">
+          <div class="card-header bg-primary-subtle border-bottom p-3">
+            <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+              <h5 class="h6 text-primary-emphasis fw-semibold mb-0">{{ item.condition.job_title|default:"Puesto sin informar" }}</h5>
+              <span class="badge bg-white text-primary-emphasis border">Jornada {{ item.condition.working_time_percentage }} %</span>
+            </div>
+            <p class="small text-body-secondary mb-0 mt-2">Desde {{ item.condition.valid_from|date:"d/m/Y" }} · Hasta {{ item.condition.valid_until|date:"d/m/Y"|default:"sin fecha de fin" }} (fin excluido)</p>
+          </div>
+          <div class="card-body p-4">
+            <div class="row g-4">
+              <div class="col-lg-5">
+                <h6 class="small fw-semibold text-uppercase text-primary mb-3">Condiciones laborales</h6>
+                <dl class="mb-0">
+                  <dt class="small text-body-secondary fw-normal">Modalidad contractual</dt><dd>{{ item.condition.contract_type }}</dd>
+                  <dt class="small text-body-secondary fw-normal">Régimen</dt><dd>{{ item.condition.social_security_regime }}</dd>
+                  <dt class="small text-body-secondary fw-normal">Convenio</dt><dd>{{ item.condition.collective_agreement }}</dd>
+                </dl>
+              </div>
+              <div class="col-lg-7">
+                <div class="bg-success-subtle border border-success-subtle rounded-3 p-3">
+                  <h6 class="small fw-semibold text-uppercase text-success-emphasis mb-3">Retribución y seguros</h6>
+                  <dl class="row small mb-0">
+                    <dt class="col-sm-7 fw-normal">Unidad del salario</dt><dd class="col-sm-5 fw-semibold">{{ item.condition.get_salary_period_display|default:"Sin informar" }}</dd>
+                    <dt class="col-sm-7 fw-normal">Número de pagas</dt><dd class="col-sm-5 fw-semibold">{{ item.condition.payments_per_year|default_if_none:"Sin informar" }}</dd>
+                    {% for amount in item.amounts %}
+                      <dt class="col-sm-7 fw-normal">{{ amount.label }}</dt><dd class="col-sm-5 fw-semibold">{{ amount.value }}</dd>
+                    {% endfor %}
+                    <dt class="col-sm-7 fw-normal">IRPF (%)</dt><dd class="col-sm-5 fw-semibold">{{ item.withholding_rate }}</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% empty %}
+        <div class="alert alert-secondary mb-0">Esta relación laboral todavía no tiene condiciones registradas.</div>
+      {% endfor %}
+    </div>
+  </section>
+{% empty %}
+  <div class="card card-body border shadow-sm rounded-4 p-4 text-body-secondary">Este empleado todavía no tiene relaciones laborales registradas.</div>
+{% endfor %}
+{% endblock %}

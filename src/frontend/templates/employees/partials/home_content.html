@@ -1,0 +1,43 @@
+<section aria-labelledby="home-title">
+  <div class="bg-dark bg-gradient text-white rounded-4 shadow-sm p-4 p-lg-5 mb-4">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-8">
+        <span class="badge bg-primary-subtle text-primary-emphasis rounded-pill mb-3">Tu espacio de trabajo</span>
+        <h1 id="home-title" class="display-5 fw-semibold mb-3">Gestión de personal</h1>
+        <p class="lead text-white-50 mb-4">Personas, contratos y condiciones laborales, organizados en un mismo lugar.</p>
+        <a class="btn btn-primary btn-lg me-2 mb-2" href="{% url 'employees:list' %}">Ver empleados</a>
+        <a class="btn btn-outline-light btn-lg mb-2" href="{% url 'employees:register' %}">Registrar empleado</a>
+      </div>
+      <div class="col-lg-4">
+        <div class="border border-secondary rounded-4 p-4">
+          <p class="small text-white-50 text-uppercase fw-semibold mb-3">Una ficha, toda la información</p>
+          <div class="d-flex align-items-center gap-3 mb-3"><span class="badge text-bg-primary rounded-pill">01</span><span>Datos del trabajador</span></div>
+          <div class="d-flex align-items-center gap-3 mb-3"><span class="badge text-bg-primary rounded-pill">02</span><span>Relación con la empresa</span></div>
+          <div class="d-flex align-items-center gap-3"><span class="badge text-bg-primary rounded-pill">03</span><span>Condiciones y retribución</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="row g-4">
+    <div class="col-md-6">
+      <div class="card border border-primary-subtle shadow-sm rounded-4 h-100">
+        <div class="card-body p-4">
+          <span class="badge bg-primary-subtle text-primary-emphasis mb-3">Consulta</span>
+          <h2 class="h4">Encuentra a tu equipo</h2>
+          <p class="text-body-secondary">Busca un trabajador y consulta sus contratos y condiciones anteriores.</p>
+          <a class="link-primary fw-semibold text-decoration-none" href="{% url 'employees:list' %}">Abrir listado &rarr;</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card border border-success-subtle shadow-sm rounded-4 h-100">
+        <div class="card-body p-4">
+          <span class="badge bg-success-subtle text-success-emphasis mb-3">Registro</span>
+          <h2 class="h4">Incorpora un trabajador</h2>
+          <p class="text-body-secondary">Completa sus datos personales, contrato y retribución en un único formulario.</p>
+          <a class="link-success fw-semibold text-decoration-none" href="{% url 'employees:register' %}">Empezar registro &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

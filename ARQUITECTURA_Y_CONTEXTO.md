@@ -1913,3 +1913,46 @@ El usuario aprueba Django Templates, Bootstrap y HTMX para listado con búsqueda
 El usuario instaló django-htmx 1.29.0 y Ruff 0.17.3 con uv. La integración HTMX (middleware, templates y recursos) todavía no está implementada. Antes de seguir se añade configuración local de Ruff en pyproject.toml: Python 3.12, longitud 79, reglas E4/E7/E9/F/I/UP. No se habilitan aún familias extensas como RUF o FURB. Las migraciones mantienen comprobaciones básicas, pero se excluyen de ordenación de imports y formato automático para no alterar archivos generados históricos.
 
 Comprobaciones sin modificación automática del Python: Ruff check encuentra seis incidencias corregibles (imports); format --check encuentra trece archivos por formatear; los veinte tests del backend siguen pasando. Siguiente paso del usuario: ruff check src/ --fix, ruff format src/ y verificaciones de lint, formato, tests y Django check. Después retomar la integración HTMX y base.html. No se han creado commits ni modificado migraciones.
+
+
+## Anexo Q. Plantilla base y HTMX (30/10/2026)
+
+El usuario confirma las comprobaciones de Ruff y los 20 tests del backend, comunica subida de sus cambios y añade Bootstrap 5.3.8 mediante Corepack/pnpm 12.16.1 en src/frontend. Se mantiene el desarrollo instructivo por fases.
+
+Implementado únicamente el primer paso del frontend aprobado: base.html, página inicial y fragmento home_content.html; vistas/rutas en backend.employees; directorios de templates y estáticos configurados en Django; app/middleware de django-htmx activados. La raíz / muestra la página inicial. Navegación a inicio con HTMX devuelve solo el fragmento, con Vary: HX-Request. Token CSRF disponible para futuras peticiones. La página inicial no muestra datos personales y dirige al administrador existente para registrar; no se han añadido aún listado, ficha ni formulario conjunto propios.
+
+Bootstrap CSS y JS bundle locales, con mapas y licencia, preparados en static/vendor/bootstrap mediante scripts/prepare-static.mjs. package.json privado con versión de pnpm fijada, dependencia Bootstrap y script prepare:static. node_modules excluido de Git; se conservan package.json, pnpm-lock.yaml y recursos compilados. HTMX 2 servido por el tag htmx_script de django-htmx desde sus estáticos incluidos. No hay CDN, CSS propio, cálculos frontend ni requisito de Node/pnpm en el Windows de destino. Se comprobó la preparación invocando directamente node; el intento de ejecutar el script a través de Corepack quedó sin respuesta y se interrumpió, sin afectar a los archivos generados.
+
+Verificado: 23 tests correctos (20 existentes y 3 de página completa, fragmento HTMX/variación y recursos locales), Django check, Ruff check y format --check correctos; script Node válido. Las tres migraciones existentes ya constan aplicadas; este paso no modifica modelos ni base de datos. No se ha realizado una prueba visual en navegador: corresponde al siguiente paso del usuario ejecutar runserver y comprobar la página. README actualizado. Sin commits.
+
+
+## Anexo R. Listado y ficha de empleados (30/10/2026)
+
+Tras la revisión visual satisfactoria de la plantilla base, el usuario autoriza continuar con el siguiente paso. Implementados listado en /employees/ y ficha en /employees/<id>/. No se implementa todavía el formulario conjunto; se mantiene el avance guiado por fases.
+
+Listado: búsqueda por palabras sobre nombre, apellidos, código interno o documento; coincidencias de cada palabra combinadas con AND; orden estable por apellidos/nombre/id; paginación de 20; búsqueda y paginación HTMX que sustituyen solo resultados; formulario GET y enlaces operativos sin JavaScript; estados vacíos. La restauración de historial HTMX devuelve documento completo cuando se solicita. La ficha muestra identidad, empresa, fechas del contrato y todos los periodos de condiciones, con importe/unidad salarial, pagas, seguros, complemento e IRPF. Se reutiliza EmploymentConditionForm para convertir importes, sin cálculos de nómina ni duplicar la conversión a céntimos.
+
+Acceso restringido a usuarios activos staff; anónimos al login existente de administración. Si caduca sesión en una petición HTMX se usa HX-Redirect para abrir el login completo. Páginas personales sin caché HTTP y desactivadas las instantáneas de historial HTMX mediante hx-history=false. Las plantillas escapan los valores introducidos por el usuario. No se introducen endpoints de escritura, modelos, migraciones ni dependencias.
+
+Verificación: 31 tests correctos (23 anteriores y 8 de listado, búsqueda, fragmentos, paginación, restauración, ficha histórica, importes exactos/cero/ausentes, permisos y escape HTML); Ruff y Django check. Se conserva la comprobación visual de navegador como siguiente paso del usuario. README actualizado. Sin commits ni modificaciones de la base de desarrollo.
+
+
+## Anexo S. Alta conjunta desde el frontend (30/10/2026)
+
+El usuario autoriza continuar. Implementado /employees/new/, accesible desde Registrar empleado en el listado. Pantalla con secciones Bootstrap para identidad, relación laboral, condiciones, retribución y cuatro seguros. Selecciona empresa existente; sin empresas informa y enlaza con el alta del administrador antes de continuar. No crea empresas implícitamente ni cambia los campos obligatorios de los modelos.
+
+EmployeeForm y EmploymentRelationshipForm declaran sus campos explícitamente. EmployeeRegistrationConditionForm reutiliza el formulario monetario existente excluyendo la relación aún no guardada. BootstrapFormMixin aplica estilos y entradas de fecha nativas; no se añade CSS propio ni dependencias. Las fechas de fin mantienen semántica exclusiva y los importes vacíos siguen siendo distintos de cero. El código interno del empleado sigue siendo obligatorio como en el modelo actual.
+
+Servicio register_employee transaccional: valida y guarda empleado, vincula/valida contrato y vincula/valida condiciones. Cualquier fallo revierte las tres escrituras. create_record/update_record reutilizan save_record para no duplicar la validación. El formulario valida todas las secciones; errores de modelo posteriores al enlace se presentan en el campo correspondiente, conservando valores. Guardado HTMX redirige con HX-Redirect a la ficha completa; POST normal utiliza redirect. Fallos de validación devuelven HTML 200 de formulario con mensajes para que HTMX lo sustituya. Se impiden envíos simultáneos desde el botón mientras hay una petición HTMX, sin sustituir las validaciones servidor.
+
+Acceso staff y CSRF existentes conservados; formularios prefijados evitan colisiones entre campos. Se ignoran vínculos de empleado/relación aportados fuera de los campos autorizados; el servicio los establece. Sin cambios de modelos, migraciones o base de desarrollo. No se implementan aún edición, nuevos contratos para empleados existentes ni actualización de condiciones desde pantallas propias; el administrador y la API mantienen esas operaciones previas.
+
+Verificación: 40 tests correctos, incluidos render, alta completa y exactitud de importes, redirects HTMX, errores entre secciones con rollback, duplicados, campos inválidos, empresa ausente, permisos/CSRF y fallo tardío del servicio. Ruff check, format --check y Django check correctos; sin migraciones pendientes de generar. README actualizado. Pendiente comprobación visual por el usuario; sin commits.
+
+## Anexo T. Jerarquía visual con Bootstrap (30/10/2026)
+
+El usuario solicita una interfaz menos plana, con secciones y contraste más cómodos. Se actualizan únicamente plantillas: cabecera oscura con acento azul, navegación responsive con sección activa, fondo gris suave, tarjetas redondeadas con bordes/sombras, portada con accesos claros, buscador separado, tabla con cabecera oscura/filas alternas e iniciales decorativas. El alta diferencia cinco secciones numeradas mediante cabeceras de color y enlaces internos; datos laborales y económicos se distinguen también en la ficha. Etiquetas y acciones con mayor jerarquía visual.
+
+Se utilizan exclusivamente componentes/utilidades incluidos en Bootstrap 5.3.8 ya disponible localmente. No se añaden CSS propio, dependencias, modelos, migraciones ni reglas funcionales. La marca de navegación vuelve al inicio mediante enlace normal para mantener correcta la sección activa; búsqueda/paginación y envío de formularios conservan HTMX. El endpoint de inicio sigue admitiendo respuesta parcial. Los colores acompañan a títulos/numeración, sin ser el único indicador de sección.
+
+Verificación: los 40 tests existentes pasan; Ruff check, format --check y Django check sin incidencias. No se añaden pruebas que solo reflejen clases CSS. Pendiente revisión visual en el navegador del usuario; sin commits.

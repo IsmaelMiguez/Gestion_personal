@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Empleados · RRHH Tool{% endblock %}
+{% block content %}
+<section aria-labelledby="employee-list-title">
+  <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-4 p-4 rounded-4 bg-primary-subtle border border-primary-subtle">
+    <div>
+    <p class="text-primary-emphasis text-uppercase fw-semibold small mb-1">Directorio de personal</p>
+    <h1 id="employee-list-title" class="h2 fw-semibold mb-2">Empleados</h1>
+    <p class="text-body-secondary mb-0">Consulta sus datos personales, contratos y condiciones.</p>
+    </div>
+    <a class="btn btn-primary px-4 shadow-sm" href="{% url 'employees:register' %}">Registrar empleado</a>
+  </div>
+  <form method="get" action="{% url 'employees:list' %}" class="card card-body border shadow-sm rounded-4 p-4 mb-4"
+        hx-get="{% url 'employees:list' %}" hx-target="#employee-results" hx-swap="outerHTML"
+        hx-trigger="submit, input changed delay:350ms from:#employee-search, search from:#employee-search"
+        hx-sync="closest section:replace" hx-replace-url="true" hx-indicator="#search-progress">
+    <label for="employee-search" class="form-label fw-semibold">Buscar empleado</label>
+    <div class="d-flex gap-2 flex-wrap flex-sm-nowrap">
+      <input id="employee-search" name="q" type="search" class="form-control" value="{{ query }}"
+             placeholder="Nombre, apellidos, código o documento" aria-controls="employee-results">
+      <button class="btn btn-primary" type="submit">Buscar</button>
+      <a class="btn btn-outline-secondary" href="{% url 'employees:list' %}">Limpiar</a>
+    </div>
+    <span id="search-progress" class="htmx-indicator text-body-secondary small mt-2" role="status">Buscando…</span>
+  </form>
+  {% include "employees/partials/employee_results.html" %}
+</section>
+{% endblock %}

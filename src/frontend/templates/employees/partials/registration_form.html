@@ -1,0 +1,111 @@
+<section id="registration-panel" aria-labelledby="registration-title">
+  <a class="btn btn-outline-secondary btn-sm mb-4" href="{% url 'employees:list' %}">Volver a empleados</a>
+  <div class="bg-primary-subtle border border-primary-subtle rounded-4 p-4 mb-4">
+    <p class="text-primary-emphasis text-uppercase small fw-semibold mb-1">Alta de personal</p>
+    <h1 id="registration-title" class="h2 fw-semibold">Registrar empleado</h1>
+    <p class="text-body-secondary mb-0">Datos personales, contrato y condiciones en un solo registro. Los campos con * son obligatorios.</p>
+  </div>
+  <nav class="d-flex gap-2 flex-wrap mb-4" aria-label="Secciones del registro">
+    <a class="btn btn-light border btn-sm" href="#personal-section">01 · Datos personales</a>
+    <a class="btn btn-light border btn-sm" href="#contract-section">02 · Relación laboral</a>
+    <a class="btn btn-light border btn-sm" href="#conditions-section">03 · Condiciones</a>
+    <a class="btn btn-light border btn-sm" href="#salary-section">04 · Retribución</a>
+    <a class="btn btn-light border btn-sm" href="#insurance-section">05 · Seguros</a>
+  </nav>
+  {% if not has_companies %}
+    <div class="alert alert-info" role="status">
+      Antes de registrar un empleado, crea su empresa en
+      <a class="alert-link" href="{% url 'admin:employees_company_add' %}" target="_blank" rel="noopener">Administración</a>.
+      Después vuelve a abrir este formulario.
+    </div>
+  {% endif %}
+  <form method="post" action="{% url 'employees:register' %}"
+        hx-post="{% url 'employees:register' %}" hx-target="#registration-panel"
+        hx-swap="outerHTML" hx-disabled-elt="find button[type='submit']"
+        hx-sync="this:drop" novalidate>
+    {% csrf_token %}
+    {% if has_errors %}
+      <div class="alert alert-danger" role="alert">No se ha guardado el registro. Revisa los campos indicados.</div>
+    {% endif %}
+    <fieldset id="personal-section" class="card border shadow-sm rounded-4 overflow-hidden mb-4">
+      <legend class="float-none w-100 d-flex align-items-center gap-3 h5 p-3 px-lg-4 m-0 bg-primary-subtle text-primary-emphasis border-bottom">
+        <span class="badge text-bg-primary rounded-pill" aria-hidden="true">01</span>
+        Datos personales
+      </legend>
+      <div class="card-body bg-body-tertiary p-4">
+      {% for error in employee_form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+      <div class="row">
+        {% for field in employee_form %}{% include "employees/partials/form_field.html" with field=field only %}{% endfor %}
+      </div>
+      </div>
+    </fieldset>
+    <fieldset id="contract-section" class="card border shadow-sm rounded-4 overflow-hidden mb-4">
+      <legend class="float-none w-100 d-flex align-items-center gap-3 h5 p-3 px-lg-4 m-0 bg-info-subtle text-info-emphasis border-bottom">
+        <span class="badge text-bg-info rounded-pill" aria-hidden="true">02</span>
+        Relación laboral
+      </legend>
+      <div class="card-body bg-body-tertiary p-4">
+      {% for error in relationship_form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+      <div class="row">
+        {% for field in relationship_form %}{% include "employees/partials/form_field.html" with field=field only %}{% endfor %}
+      </div>
+      <p class="form-text mb-0">Las fechas de fin son opcionales y excluyen ese día del periodo. La fecha de antigüedad puede ser anterior al inicio del contrato.</p>
+      </div>
+    </fieldset>
+    <fieldset id="conditions-section" class="card border shadow-sm rounded-4 overflow-hidden mb-4">
+      <legend class="float-none w-100 d-flex align-items-center gap-3 h5 p-3 px-lg-4 m-0 bg-primary-subtle text-primary-emphasis border-bottom">
+        <span class="badge text-bg-primary rounded-pill" aria-hidden="true">03</span>
+        Condiciones laborales
+      </legend>
+      <div class="card-body bg-body-tertiary p-4">
+      {% for error in condition_form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+      <div class="row">
+        {% include "employees/partials/form_field.html" with field=condition_form.job_title only %}
+        {% include "employees/partials/form_field.html" with field=condition_form.contract_type only %}
+        {% include "employees/partials/form_field.html" with field=condition_form.working_time_percentage only %}
+        {% include "employees/partials/form_field.html" with field=condition_form.social_security_regime only %}
+        {% include "employees/partials/form_field.html" with field=condition_form.collective_agreement only %}
+        {% include "employees/partials/form_field.html" with field=condition_form.valid_from only %}
+        {% include "employees/partials/form_field.html" with field=condition_form.valid_until only %}
+      </div>
+      </div>
+    </fieldset>
+    <fieldset id="salary-section" class="card border shadow-sm rounded-4 overflow-hidden mb-4">
+      <legend class="float-none w-100 d-flex align-items-center gap-3 h5 p-3 px-lg-4 m-0 bg-success-subtle text-success-emphasis border-bottom">
+        <span class="badge text-bg-success rounded-pill" aria-hidden="true">04</span>
+        Retribución
+      </legend>
+      <div class="card-body bg-body-tertiary p-4">
+      <div class="row">
+        {% include "employees/partials/form_field.html" with field=condition_form.salary_amount only %}
+        {% include "employees/partials/form_field.html" with field=condition_form.salary_period only %}
+        {% include "employees/partials/form_field.html" with field=condition_form.payments_per_year only %}
+        {% include "employees/partials/form_field.html" with field=condition_form.fixed_supplement only %}
+        {% include "employees/partials/form_field.html" with field=condition_form.withholding_rate only %}
+      </div>
+      <p class="form-text mb-0">Introduce los importes en euros. Un campo vacío significa que el dato no está informado; utiliza 0 cuando corresponda un importe cero.</p>
+      </div>
+    </fieldset>
+    <fieldset id="insurance-section" class="card border shadow-sm rounded-4 overflow-hidden mb-4">
+      <legend class="float-none w-100 d-flex align-items-center gap-3 h5 p-3 px-lg-4 m-0 bg-secondary-subtle text-secondary-emphasis border-bottom">
+        <span class="badge text-bg-secondary rounded-pill" aria-hidden="true">05</span>
+        Seguros mensuales
+      </legend>
+      <div class="card-body bg-body-tertiary p-4">
+      <div class="row">
+        {% include "employees/partials/form_field.html" with field=condition_form.employee_insurance_exempt only %}
+        {% include "employees/partials/form_field.html" with field=condition_form.employee_insurance_taxable only %}
+        {% include "employees/partials/form_field.html" with field=condition_form.family_insurance_exempt only %}
+        {% include "employees/partials/form_field.html" with field=condition_form.family_insurance_taxable only %}
+      </div>
+      </div>
+    </fieldset>
+    <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap bg-white border rounded-4 p-4 shadow-sm mb-4">
+      <span class="text-body-secondary small">Revisa los datos antes de guardar.</span>
+      <div class="d-flex gap-2">
+      <button class="btn btn-primary px-4" type="submit" {% if not has_companies %}disabled{% endif %}>Guardar empleado y contrato</button>
+      <a class="btn btn-outline-secondary" href="{% url 'employees:list' %}">Cancelar</a>
+      </div>
+    </div>
+  </form>
+</section>

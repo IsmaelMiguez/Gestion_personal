@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APIClient
 
 from .models import (
@@ -367,3 +367,40 @@ class EmploymentRegistrationTests(TestCase):
             EmploymentCondition.objects.filter(pk=condition.pk).update(
                 payments_per_year=13
             )
+
+
+class FrontendShellTests(SimpleTestCase):
+    def test_home_renders_shell_with_local_assets_and_csrf(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "base.html")
+        self.assertContains(response, '<html lang="es">')
+        self.assertContains(
+            response, "/static/vendor/bootstrap/bootstrap.min.css"
+        )
+        self.assertContains(response, "/static/django_htmx/htmx-2.min.js")
+        self.assertContains(response, "x-csrftoken")
+        self.assertIn("csrftoken", response.cookies)
+        self.assertNotContains(response, "https://cdn.")
+
+    def test_htmx_navigation_returns_content_without_page_shell(self):
+        response = self.client.get("/", HTTP_HX_REQUEST="true")
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response, "employees/partials/home_content.html"
+        )
+        self.assertContains(response, 'id="home-title"')
+        self.assertNotContains(response, "<!doctype html>")
+        self.assertNotContains(response, "<nav")
+        self.assertIn("HX-Request", response.headers["Vary"])
+
+    def test_required_static_files_are_available_to_django(self):
+        from django.contrib.staticfiles import finders
+
+        for path in (
+            "vendor/bootstrap/bootstrap.min.css",
+            "vendor/bootstrap/bootstrap.bundle.min.js",
+            "django_htmx/htmx-2.min.js",
+        ):
+            with self.subTest(path=path):
+                self.assertIsNotNone(finders.find(path))

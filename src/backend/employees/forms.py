@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django import forms
 
-from .models import EmploymentCondition
+from .models import Employee, EmploymentCondition, EmploymentRelationship
 
 
 def euro_field(label):
@@ -71,3 +71,47 @@ class EmploymentConditionForm(forms.ModelForm):
                 int(rate * 100) if rate is not None else None
             )
         super()._post_clean()
+
+
+class BootstrapFormMixin:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            if isinstance(field, forms.DateField):
+                field.widget = forms.DateInput(
+                    attrs={"type": "date"}, format="%Y-%m-%d"
+                )
+            field.widget.attrs["class"] = (
+                "form-select"
+                if isinstance(field.widget, forms.Select)
+                else "form-control"
+            )
+
+
+class EmployeeForm(BootstrapFormMixin, forms.ModelForm):
+    class Meta:
+        model = Employee
+        fields = (
+            "internal_code",
+            "first_name",
+            "last_name",
+            "birth_date",
+            "identification_type",
+            "tax_id",
+        )
+
+
+class EmploymentRelationshipForm(BootstrapFormMixin, forms.ModelForm):
+    class Meta:
+        model = EmploymentRelationship
+        fields = ("company", "start_date", "end_date", "seniority_date")
+
+
+class EmployeeRegistrationConditionForm(
+    BootstrapFormMixin, EmploymentConditionForm
+):
+    class Meta(EmploymentConditionForm.Meta):
+        exclude = (
+            *EmploymentConditionForm.Meta.exclude,
+            "employment_relationship",
+        )

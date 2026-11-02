@@ -1,0 +1,55 @@
+<div id="employee-results" aria-live="polite" aria-atomic="true">
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <h2 class="h6 mb-0 text-body-secondary">Resultados</h2>
+    <span class="badge rounded-pill bg-white text-dark border">{{ page.paginator.count }} empleado{{ page.paginator.count|pluralize:"s" }}</span>
+  </div>
+  {% if page.object_list %}
+    <div class="card border shadow-sm rounded-4 overflow-hidden">
+      <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle mb-0">
+          <caption class="visually-hidden">Resultados de empleados</caption>
+          <thead class="table-dark">
+            <tr><th scope="col">Empleado</th><th scope="col">Código</th><th scope="col">Documento</th><th scope="col"><span class="visually-hidden">Acciones</span></th></tr>
+          </thead>
+          <tbody>
+          {% for employee in page %}
+            <tr>
+              <th scope="row" class="fw-normal">
+                <div class="d-flex align-items-center gap-3 py-2">
+                  <span class="badge bg-primary-subtle text-primary-emphasis rounded-circle p-3" aria-hidden="true">{{ employee.first_name|slice:":1"|upper }}{{ employee.last_name|slice:":1"|upper }}</span>
+                  <span class="fw-semibold">{{ employee.first_name }} {{ employee.last_name }}</span>
+                </div>
+              </th>
+              <td><span class="badge text-bg-light border fw-normal">{{ employee.internal_code }}</span></td>
+              <td>{{ employee.get_identification_type_display }} {{ employee.tax_id|default:"Sin informar" }}</td>
+              <td class="text-end"><a class="btn btn-outline-primary btn-sm text-nowrap" href="{% url 'employees:detail' employee.pk %}">Ver ficha<span class="visually-hidden"> de {{ employee.first_name }} {{ employee.last_name }}</span></a></td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% if page.has_other_pages %}
+      <nav class="d-flex justify-content-between align-items-center mt-3" aria-label="Páginas de empleados">
+        <span class="small text-body-secondary">Página {{ page.number }} de {{ page.paginator.num_pages }}</span>
+        <div class="btn-group">
+          {% if page.has_previous %}
+            <a class="btn btn-outline-secondary" href="{% querystring page=page.previous_page_number %}"
+               hx-get="{% url 'employees:list' %}{% querystring page=page.previous_page_number %}"
+               hx-target="#employee-results" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest section:replace">Anterior</a>
+          {% endif %}
+          {% if page.has_next %}
+            <a class="btn btn-outline-secondary" href="{% querystring page=page.next_page_number %}"
+               hx-get="{% url 'employees:list' %}{% querystring page=page.next_page_number %}"
+               hx-target="#employee-results" hx-swap="outerHTML" hx-replace-url="true" hx-sync="closest section:replace">Siguiente</a>
+          {% endif %}
+        </div>
+      </nav>
+    {% endif %}
+  {% else %}
+    <div class="card card-body border shadow-sm rounded-4 text-center py-5">
+      <h2 class="h5">{% if query %}No hay coincidencias{% else %}Todavía no hay empleados{% endif %}</h2>
+      <p class="text-body-secondary mb-0">{% if query %}Prueba con otro nombre, código o documento.{% else %}Pulsa Registrar empleado para añadir el primero.{% endif %}</p>
+    </div>
+  {% endif %}
+</div>
