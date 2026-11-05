@@ -5,8 +5,8 @@
     <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
        {% if request.resolver_match.url_name == 'home' %}aria-current="page"{% endif %}
        href="{% url 'employees:home' %}">Resumen</a>
-    <a class="nav-link {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'edit' %}active{% endif %}"
-       {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'edit' %}aria-current="page"{% endif %}
+    <a class="nav-link {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'edit' or request.resolver_match.url_name == 'delete' or request.resolver_match.url_name == 'condition-add' or request.resolver_match.url_name == 'condition-change' or request.resolver_match.url_name == 'condition-delete' %}active{% endif %}"
+       {% if request.resolver_match.url_name == 'list' or request.resolver_match.url_name == 'detail' or request.resolver_match.url_name == 'edit' or request.resolver_match.url_name == 'delete' or request.resolver_match.url_name == 'condition-add' or request.resolver_match.url_name == 'condition-change' or request.resolver_match.url_name == 'condition-delete' %}aria-current="page"{% endif %}
        href="{% url 'employees:list' %}">Empleados</a>
     <a class="nav-link {% if request.resolver_match.url_name == 'register' %}active{% endif %}"
        {% if request.resolver_match.url_name == 'register' %}aria-current="page"{% endif %}

@@ -81,6 +81,9 @@ class BootstrapFormMixin:
                 field.widget = forms.DateInput(
                     attrs={"type": "date"}, format="%Y-%m-%d"
                 )
+            if isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs["class"] = "form-check-input"
+                continue
             field.widget.attrs["class"] = (
                 "form-select"
                 if isinstance(field.widget, forms.Select)
@@ -115,3 +118,18 @@ class EmployeeRegistrationConditionForm(
             *EmploymentConditionForm.Meta.exclude,
             "employment_relationship",
         )
+
+
+class ConditionChangeForm(EmployeeRegistrationConditionForm):
+    class Meta(EmployeeRegistrationConditionForm.Meta):
+        exclude = (
+            *EmployeeRegistrationConditionForm.Meta.exclude,
+            "valid_until",
+        )
+
+
+class DeletionConfirmationForm(BootstrapFormMixin, forms.Form):
+    confirm = forms.BooleanField(
+        label="Confirmo que quiero eliminar los datos indicados.",
+        required=True,
+    )

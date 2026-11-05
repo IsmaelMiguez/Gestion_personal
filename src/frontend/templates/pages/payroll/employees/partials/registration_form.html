@@ -52,54 +52,7 @@
       <p class="form-text mb-0">Las fechas de fin son opcionales y excluyen ese día del periodo. La fecha de antigüedad puede ser anterior al inicio del contrato.</p>
       </div>
     </fieldset>
-    <fieldset id="conditions-section" class="card border shadow-sm rounded-4 overflow-hidden mb-4">
-      <legend class="float-none w-100 d-flex align-items-center gap-3 h5 p-3 px-lg-4 m-0 bg-primary-subtle text-primary-emphasis border-bottom">
-        <span class="badge text-bg-primary rounded-pill" aria-hidden="true">03</span>
-        Condiciones laborales
-      </legend>
-      <div class="card-body bg-body-tertiary p-4">
-      {% for error in condition_form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
-      <div class="row">
-        {% include "components/form_field.html" with field=condition_form.job_title only %}
-        {% include "components/form_field.html" with field=condition_form.contract_type only %}
-        {% include "components/form_field.html" with field=condition_form.working_time_percentage only %}
-        {% include "components/form_field.html" with field=condition_form.social_security_regime only %}
-        {% include "components/form_field.html" with field=condition_form.collective_agreement only %}
-        {% include "components/form_field.html" with field=condition_form.valid_from only %}
-        {% include "components/form_field.html" with field=condition_form.valid_until only %}
-      </div>
-      </div>
-    </fieldset>
-    <fieldset id="salary-section" class="card border shadow-sm rounded-4 overflow-hidden mb-4">
-      <legend class="float-none w-100 d-flex align-items-center gap-3 h5 p-3 px-lg-4 m-0 bg-success-subtle text-success-emphasis border-bottom">
-        <span class="badge text-bg-success rounded-pill" aria-hidden="true">04</span>
-        Retribución
-      </legend>
-      <div class="card-body bg-body-tertiary p-4">
-      <div class="row">
-        {% include "components/form_field.html" with field=condition_form.salary_amount only %}
-        {% include "components/form_field.html" with field=condition_form.salary_period only %}
-        {% include "components/form_field.html" with field=condition_form.payments_per_year only %}
-        {% include "components/form_field.html" with field=condition_form.fixed_supplement only %}
-        {% include "components/form_field.html" with field=condition_form.withholding_rate only %}
-      </div>
-      <p class="form-text mb-0">Introduce los importes en euros. Un campo vacío significa que el dato no está informado; utiliza 0 cuando corresponda un importe cero.</p>
-      </div>
-    </fieldset>
-    <fieldset id="insurance-section" class="card border shadow-sm rounded-4 overflow-hidden mb-4">
-      <legend class="float-none w-100 d-flex align-items-center gap-3 h5 p-3 px-lg-4 m-0 bg-secondary-subtle text-secondary-emphasis border-bottom">
-        <span class="badge text-bg-secondary rounded-pill" aria-hidden="true">05</span>
-        Seguros mensuales
-      </legend>
-      <div class="card-body bg-body-tertiary p-4">
-      <div class="row">
-        {% include "components/form_field.html" with field=condition_form.employee_insurance_exempt only %}
-        {% include "components/form_field.html" with field=condition_form.employee_insurance_taxable only %}
-        {% include "components/form_field.html" with field=condition_form.family_insurance_exempt only %}
-        {% include "components/form_field.html" with field=condition_form.family_insurance_taxable only %}
-      </div>
-      </div>
-    </fieldset>
+    {% include "pages/payroll/employees/partials/condition_fields.html" with section_start=3 %}
     <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap bg-white border rounded-4 p-4 shadow-sm mb-4">
       <span class="text-body-secondary small">Revisa los datos antes de guardar.</span>
       <div class="d-flex gap-2">

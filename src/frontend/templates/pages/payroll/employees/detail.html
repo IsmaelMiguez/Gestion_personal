@@ -13,7 +13,10 @@
 <section class="card border shadow-sm rounded-4 overflow-hidden mb-4" aria-labelledby="personal-data-title">
   <div class="card-header bg-white border-bottom p-3 px-lg-4 d-flex align-items-center justify-content-between gap-3 flex-wrap">
     <h2 id="personal-data-title" class="h5 mb-0">Datos personales</h2>
-    <a class="btn btn-outline-primary btn-sm" href="{% url 'employees:edit' employee.pk %}">Editar datos personales</a>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-outline-primary btn-sm" href="{% url 'employees:edit' employee.pk %}">Editar datos personales</a>
+      <a class="btn btn-outline-danger btn-sm" href="{% url 'employees:delete' employee.pk %}">Eliminar empleado</a>
+    </div>
   </div>
   <div class="card-body bg-body-tertiary p-4">
     <dl class="row mb-0">
@@ -39,13 +42,20 @@
         <div class="col-md-4"><div class="bg-white border rounded-3 p-3 h-100"><p class="text-body-secondary small mb-1">Fin (excluido)</p><p class="fw-semibold mb-0">{{ contract.relationship.end_date|date:"d/m/Y"|default:"Sin fecha de fin" }}</p></div></div>
         <div class="col-md-4"><div class="bg-white border rounded-3 p-3 h-100"><p class="text-body-secondary small mb-1">Antigüedad reconocida</p><p class="fw-semibold mb-0">{{ contract.relationship.seniority_date|date:"d/m/Y" }}</p></div></div>
       </div>
-      <h4 class="h6 text-body-secondary mb-3">Histórico de condiciones</h4>
+      <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+        <h4 class="h6 text-body-secondary mb-0">Histórico de condiciones</h4>
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'employees:condition-add' employee.pk contract.relationship.pk %}">Añadir condiciones</a>
+      </div>
       {% for item in contract.conditions %}
         <div class="card border rounded-3 overflow-hidden mb-3">
           <div class="card-header bg-primary-subtle border-bottom p-3">
             <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
               <h5 class="h6 text-primary-emphasis fw-semibold mb-0">{{ item.condition.job_title|default:"Puesto sin informar" }}</h5>
-              <span class="badge bg-white text-primary-emphasis border">Jornada {{ item.condition.working_time_percentage }} %</span>
+              <div class="d-flex gap-2 align-items-center flex-wrap">
+                <span class="badge bg-white text-primary-emphasis border">Jornada {{ item.condition.working_time_percentage }} %</span>
+                <a class="btn btn-primary btn-sm" href="{% url 'employees:condition-change' employee.pk item.condition.pk %}">Cambiar condiciones<span class="visually-hidden"> del periodo {{ item.condition.valid_from|date:"d/m/Y" }}</span></a>
+                <a class="btn btn-outline-danger btn-sm" href="{% url 'employees:condition-delete' employee.pk item.condition.pk %}">Eliminar periodo<span class="visually-hidden"> {{ item.condition.valid_from|date:"d/m/Y" }}</span></a>
+              </div>
             </div>
             <p class="small text-body-secondary mb-0 mt-2">Desde {{ item.condition.valid_from|date:"d/m/Y" }} · Hasta {{ item.condition.valid_until|date:"d/m/Y"|default:"sin fecha de fin" }} (fin excluido)</p>
           </div>

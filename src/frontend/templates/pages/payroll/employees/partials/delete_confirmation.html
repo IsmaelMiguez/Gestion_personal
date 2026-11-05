@@ -1,0 +1,33 @@
+<section id="delete-panel" aria-labelledby="delete-title">
+  <div class="card border border-danger-subtle rounded-4 shadow-sm overflow-hidden">
+    <div class="card-header bg-danger-subtle text-danger-emphasis p-4">
+      <h1 id="delete-title" class="h3 mb-2">{{ heading }}</h1>
+      <p class="mb-0">{{ employee.first_name }} {{ employee.last_name }} · {{ employee.internal_code }}</p>
+    </div>
+    <div class="card-body p-4">
+      {% if condition %}
+        <p>Se eliminará el periodo de condiciones de <strong>{{ condition.employment_relationship.company.name }}</strong> desde {{ condition.valid_from|date:"d/m/Y" }} hasta {{ condition.valid_until|date:"d/m/Y"|default:"sin fecha de fin" }} (fin excluido).</p>
+        <p class="text-body-secondary">El empleado y el contrato se conservan. Los periodos vecinos no se ampliarán automáticamente; puede quedar un intervalo sin condiciones.</p>
+      {% else %}
+        <p>Se eliminará este empleado junto con <strong>{{ relationship_count }} contrato{{ relationship_count|pluralize:"s" }}</strong> y <strong>{{ condition_count }} periodo{{ condition_count|pluralize:"s" }} de condiciones</strong>.</p>
+        <p class="text-body-secondary">Las empresas y los demás empleados se conservan.</p>
+      {% endif %}
+      <div class="alert alert-warning">Esta eliminación es permanente.</div>
+      <form method="post" action="{{ request.path }}" hx-post="{{ request.path }}"
+            hx-target="#delete-panel" hx-swap="outerHTML"
+            hx-disabled-elt="find button[type='submit']" hx-sync="this:drop" novalidate>
+        {% csrf_token %}
+        {% for error in form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endfor %}
+        <div class="form-check mb-3">
+          {{ form.confirm }}
+          <label class="form-check-label" for="{{ form.confirm.id_for_label }}">{{ form.confirm.label }}</label>
+          {% if form.confirm.errors %}<div class="invalid-feedback d-block" id="{{ form.confirm.auto_id }}_error">{% for error in form.confirm.errors %}<div>{{ error }}</div>{% endfor %}</div>{% endif %}
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-danger" type="submit">{{ heading }}</button>
+          <a class="btn btn-outline-secondary" href="{% url 'employees:detail' employee.pk %}">Cancelar</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>

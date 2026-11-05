@@ -1,0 +1,24 @@
+<section id="condition-panel" aria-labelledby="condition-title">
+  <a class="btn btn-light border btn-sm mb-4" href="{% url 'employees:detail' employee.pk %}">&larr; Volver a la ficha</a>
+  <div class="bg-primary-subtle border border-primary-subtle rounded-4 p-4 mb-4">
+    <p class="text-primary-emphasis small text-uppercase fw-semibold mb-1">{{ employee.first_name }} {{ employee.last_name }} · {{ relationship.company.name }}</p>
+    <h1 id="condition-title" class="h2 fw-semibold">{{ heading }}</h1>
+    {% if previous %}
+      <p class="text-body-secondary mb-0">Indica desde cuándo cambian las condiciones. El periodo anterior terminará ese día y conservará sus importes; el nuevo mantendrá la fecha de fin prevista.</p>
+      <p class="small mb-0 mt-2">Periodo seleccionado: {{ previous.valid_from|date:"d/m/Y" }} — {{ previous.valid_until|date:"d/m/Y"|default:"sin fecha de fin" }} (fin excluido).</p>
+    {% else %}
+      <p class="text-body-secondary mb-0">Registra un periodo dentro de las fechas del contrato, sin solapar condiciones ya existentes.</p>
+    {% endif %}
+  </div>
+  <form method="post" action="{{ request.path }}" hx-post="{{ request.path }}"
+        hx-target="#condition-panel" hx-swap="outerHTML"
+        hx-disabled-elt="find button[type='submit']" hx-sync="this:drop" novalidate>
+    {% csrf_token %}
+    {% if condition_form.errors %}<div class="alert alert-danger" role="alert">No se han guardado los cambios. Revisa los campos indicados.</div>{% endif %}
+    {% include "pages/payroll/employees/partials/condition_fields.html" with section_start=1 %}
+    <div class="bg-white border rounded-4 p-4 d-flex gap-2 flex-wrap">
+      <button class="btn btn-primary" type="submit">Guardar condiciones</button>
+      <a class="btn btn-outline-secondary" href="{% url 'employees:detail' employee.pk %}">Cancelar</a>
+    </div>
+  </form>
+</section>

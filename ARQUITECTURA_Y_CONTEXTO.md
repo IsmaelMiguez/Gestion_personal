@@ -1990,3 +1990,18 @@ Verificación: 59 tests correctos ejecutados con `test backend.employees fronten
 A petición del usuario se agrupan los tests de backend.employees en un paquete tests/ con __init__.py vacío. tests.py se divide en test_backend.py (validaciones, servicios, API y formulario admin) y test_shell.py (estructura visual/estáticos). Los módulos dispersos se trasladan a test_pages.py, test_registration.py y test_edit.py dentro de la misma carpeta. Se ajustan los imports relativos; no se modifica la lógica ni se duplican clases de prueba.
 
 El comando `test backend.employees frontend.pages` sigue descubriendo las 59 pruebas, todas correctas. Se mantiene la comprobación de Ruff/formato y Django check. Sin cambios funcionales, migraciones ni commits.
+
+
+## Anexo X. Condiciones con histórico y borrado confirmado (05/11/2026)
+
+El usuario autoriza continuar con cambios de condiciones y añade explícitamente la posibilidad de eliminar empleados o condiciones no deseadas. Se implementan estas operaciones sobre los cuatro modelos existentes, sin nuevos campos o migraciones.
+
+Desde cada periodo, Cambiar condiciones precarga los valores laborales y monetarios y exige una nueva fecha efectiva. El servicio change_conditions divide el periodo seleccionado: conserva sus importes originales, termina el anterior en la fecha del cambio y crea el nuevo con el mismo fin que tenía el original. Rechaza fechas iguales/anteriores al inicio o iguales/posteriores al fin. Los periodos futuros existentes permanecen intactos. El fin del nuevo periodo y el contrato se resuelven en servidor, ignorando valores de esos vínculos/fin aportados fuera del formulario. Una transacción revierte también el cierre anterior si falla la nueva condición. Se admite dividir un periodo histórico seleccionado; no se presupone que sea siempre el vigente hoy.
+
+Añadir condiciones, en cada relación laboral, permite registrar un periodo nuevo o reponer uno eliminado; conserva las validaciones de límites del contrato y ausencia de solapamientos. No rellena huecos ni calcula nóminas.
+
+Borrado físico opcional, solicitado expresamente por el usuario: GET muestra confirmación con identidad/periodo e impacto; POST requiere CSRF, staff y casilla confirmada. Eliminar empleado elimina transaccionalmente sus condiciones, después contratos y finalmente empleado, preservando empresas y otras personas. Eliminar periodo solo borra esa condición; no modifica fechas vecinas, y la confirmación explica que puede quedar un hueco. Los modelos mantienen PROTECT; dependencias protegidas ajenas a estos vínculos se notifican y revierten el borrado completo. Esta eliminación voluntaria no cambia el tratamiento de bajas laborales ni introduce borrados automáticos. No se ha eliminado ningún dato real de la base de desarrollo.
+
+Las vistas nuevas se separan en condition_views.py y deletion_views.py para mantener manejable views.py. Formularios reutilizan conversión monetaria existente. partials/condition_fields.html se comparte con el alta conjunta para evitar duplicar sus secciones. Se mantienen Bootstrap, HTMX, alternativas POST normales, permisos, no-cache y nombres de campos. La API no incorpora borrado en este paso.
+
+Verificación: 71 tests correctos (59 anteriores y 12 de condiciones/borrado), incluyendo precarga exacta, histórico, límites, periodos futuros, rollback por validación tardía, solapamientos, confirmación sin efectos por GET/POST vacío, borrado dependiente acotado, conservación de empresa y otros trabajadores, dependencias protegidas y controles de permisos/CSRF. Ruff/formato, Django check y ausencia de nuevas migraciones comprobados. Pendiente revisión visual del usuario; sin commits.

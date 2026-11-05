@@ -43,7 +43,9 @@ src/frontend/
         └── documents/index.html
 ```
 
-`/payroll/employees/` contiene el listado con búsqueda y paginación. Desde Registrar empleado (`/payroll/employees/new/`) se guardan datos personales, contrato y condiciones conjuntamente; selecciona una empresa existente o créala antes desde Administración. La ficha permite editar datos personales sin modificar contratos ni salarios.
+`/payroll/employees/` contiene el listado con búsqueda y paginación. Desde Registrar empleado (`/payroll/employees/new/`) se guardan datos personales, contrato y condiciones conjuntamente; selecciona una empresa existente o créala antes desde Administración. La ficha permite editar datos personales sin modificar contratos ni salarios. Cada periodo tiene Cambiar condiciones: solicita una fecha interior al periodo, cierra el anterior ese día y crea otro conservando el fin previsto. Añadir condiciones permite registrar periodos nuevos sin solapamientos.
+
+La ficha también permite Eliminar periodo y Eliminar empleado. Ambas operaciones requieren abrir una confirmación y marcar expresamente la casilla. Eliminar un empleado incluye sus contratos y condiciones, conservando empresas y otros empleados. Eliminar un periodo no extiende los vecinos y puede dejar un intervalo sin condiciones.
 
 `/documents/` solo muestra una página de sección pendiente. No tiene operaciones documentales ni depende de las vistas de empleados. La API `/api/` y el administrador `/admin/` conservan sus rutas. Las antiguas pantallas `/employees/…` se han trasladado bajo `/payroll/`.
 
