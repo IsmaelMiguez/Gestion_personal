@@ -82,7 +82,14 @@ class EmploymentRelationshipSerializer(ValidatedModelSerializer):
 
 
 class EmploymentConditionSerializer(ValidatedModelSerializer):
-    salary_amount = HundredthsField(source="salary_amount_cents")
+    salary_amount = HundredthsField(
+        source="salary_amount_cents",
+        label="Sueldo base (€)",
+        help_text=(
+            "Sueldo base de la jornada habitual contratada. "
+            "Antigüedad, seguros y complementos se añaden aparte."
+        ),
+    )
     employee_insurance_exempt = HundredthsField(
         source="employee_insurance_exempt_cents"
     )

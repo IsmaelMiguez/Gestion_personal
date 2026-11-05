@@ -4,7 +4,7 @@ Proyecto de aplicación portable para Windows destinada a gestión y cálculo de
 
 La propuesta completa, las restricciones, las decisiones pendientes y un prompt para nuevas conversaciones están en [ARQUITECTURA_Y_CONTEXTO.md](ARQUITECTURA_Y_CONTEXTO.md).
 
-Estado actual: acceso propio mediante Django, sección Nóminas con registro/consulta/edición de empleados y espacio independiente reservado para Gestión documental. Motor de cálculo, funciones documentales y distribución Windows pendientes.
+Estado actual: acceso propio mediante Django, sección Nóminas con registro/consulta/edición de empleados y espacio independiente reservado para Gestión documental. Primer cálculo del motor independiente: reparto de sueldo base anual/mensual. Cálculo de nómina completa, funciones documentales y distribución Windows pendientes.
 
 ## Desarrollo del frontend
 
@@ -59,3 +59,60 @@ uv run python src/manage.py check
 ```
 
 Las pruebas del módulo de empleados están agrupadas en `src/backend/employees/tests/`. Puedes ejecutarlas todas con `uv run python src/manage.py test backend.employees` o seleccionar un bloque, por ejemplo `uv run python src/manage.py test backend.employees.tests.test_edit`. Las pruebas de acceso y secciones están en `frontend.pages`.
+
+
+## Motor Python independiente
+
+`src/payroll_engine/base_salary.py` contiene el primer bloque de cálculo: reparto del sueldo base para un año completo con condiciones constantes, entre doce o catorce pagas. Antigüedad, seguros y complementos se añaden aparte; el importe registrado se ha confirmado como sueldo base.
+
+- `base_salary_from_annual(amount, payments_per_year, rounding)` parte del sueldo base anual.
+- `base_salary_from_monthly(amount, payments_per_year, rounding)` parte del sueldo base por paga ordinaria, con extras de base iguales en el caso de catorce pagas.
+- `BaseSalaryBreakdown` devuelve anual, importe por ordinaria, número/importe de extras y diferencia de redondeo pendiente de distribuir. Esa diferencia no se aplica automáticamente a ningún pago.
+
+Las entradas monetarias son `Decimal`; el redondeo debe indicarse explícitamente. Las pruebas usan `ROUND_HALF_UP` como ejemplo y `ROUND_DOWN` para comprobar que se respeta la política elegida: no se ha aprobado una política normativa de redondeo. El contexto decimal del cálculo es local y no depende de la configuración decimal de quien lo invoca.
+
+Ejemplo de alcance: 28.000 € de sueldo base anual en catorce pagas produce doce ordinarias de 2.000 € y dos extras de base de 2.000 €, antes de otros conceptos o deducciones. Las extras se mantienen separadas del importe de una mensualidad ordinaria.
+
+Para probar el motor sin configurar Django:
+
+```bash
+uv run python -m unittest discover -s src/payroll_engine/tests -t src
+```
+
+El reparto base no está conectado todavía a las pantallas. El importe ya corresponde a la jornada habitual del contrato: un sueldo mensual de 1.000 € para un contrato al 50 % se mantiene en 1.000 €, sin reducirlo otra vez. Las reducciones temporales se tratarán como incidencias relativas a esa jornada habitual, separadas de las condiciones contractuales. No se equipara automáticamente una reducción por cuidado de un hijo con NCM ni con otra situación: sus reglas se concretarán al implementar cada supuesto. La prueba portable Windows se pospone por decisión expresa del usuario.
+
+### Primera nómina ordinaria de 2026
+
+`ordinary_payroll.py` añade `calculate_ordinary_payroll_2026`: mes completo, jornada completa, contrato indefinido ordinario del Régimen General, cotización mensual (grupos 1–7), condiciones constantes y exclusivamente sueldo base. No se aplica a sistemas especiales, pluriempleo, bonificaciones, cotizaciones adicionales por jubilación, incidencias ni conceptos adicionales. El llamador debe comprobar ese alcance antes de usarlo con un empleado. No se ha conectado a empleados ni se han añadido campos o migraciones.
+
+`rules_2026.py` separa bases, tipos y tramos de la fórmula, con referencia a la [Orden PJC/297/2026](https://www.boe.es/buscar/act.php?id=BOE-A-2026-7296), artículos 1–4, 16, 17 y 33. La versión es explícitamente 2026: no sirve como normativa de otros ejercicios. El grupo y el tipo total AT/EP se reciben expresamente; el tipo AT/EP debe verificarse según actividad/ocupación, no se deduce del nombre del puesto. El porcentaje IRPF ya determinado se aplica al bruto pagado, según el [artículo 80 del Reglamento del IRPF](https://www.boe.es/buscar/act.php?id=BOE-A-2007-6820#a80); no calcula ni regulariza dicho porcentaje.
+
+El resultado devuelve prorrata de extras para cotización, bases antes y después de topes, cuotas desglosadas por concepto y pagador, retención y líquido. Las extras no se pagan en este resultado. `employer_cash_cost` es bruto ordinario más cuotas empresariales del mes; no incluye el devengo de extras pendiente de pago. La diferencia anual de redondeo permanece visible en `salary.annual_rounding_difference`, pendiente de una regla de distribución. Cada cuota y la prorrata se redondean a céntimos con la política recibida; debe contrastarse con el software oficial. Aplicar bases mínimas no certifica que el salario cumpla el SMI o el convenio.
+
+Prueba práctica desde la raíz, sin arrancar Django ni modificar la base de datos:
+
+```bash
+PYTHONPATH=src uv run python - <<'PY'
+from decimal import Decimal, ROUND_HALF_UP
+from payroll_engine.ordinary_payroll import calculate_ordinary_payroll_2026
+
+result = calculate_ordinary_payroll_2026(
+    annual_base_salary=Decimal("28000.00"),
+    payments_per_year=14,
+    contribution_group=5,
+    withholding_rate=Decimal("15.00"),
+    occupational_risk_rate=Decimal("1.50"),
+    rounding=ROUND_HALF_UP,
+)
+print("Bruto ordinario:", result.salary.ordinary_payment_amount)
+print("Prorrata extras para cotización:", result.extra_payment_accrual)
+for line in result.contributions:
+    print(line.name, "base:", line.base,
+          "trabajador:", line.employee_amount, "empresa:", line.employer_amount)
+print("IRPF:", result.withholding_amount)
+print("Líquido:", result.net_amount)
+print("Bruto ordinario + cuotas empresa:", result.employer_cash_cost)
+PY
+```
+
+Los tipos IRPF y AT/EP del ejemplo son entradas ilustrativas, no valores predeterminados ni una recomendación para un empleado concreto. Resultado: bruto 2.000,00 €, prorrata 333,33 €, cuota trabajador 151,67 €, cuota empresa 750,17 €, IRPF 300,00 € y líquido 1.548,33 €. Para partir de una cantidad mensual puede obtenerse el anual mediante `base_salary_from_monthly`; no se transforma a jornada completa.

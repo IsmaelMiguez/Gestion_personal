@@ -18,7 +18,12 @@ def euro_field(label):
 class EmploymentConditionForm(forms.ModelForm):
     """Present euros and percentages while persisting scaled integers."""
 
-    salary_amount = euro_field("Importe salarial (€)")
+    salary_amount = euro_field("Sueldo base (€)")
+    salary_amount.help_text = (
+        "Importe correspondiente a la jornada habitual del contrato, "
+        "sin antigüedad, seguros ni complementos. "
+        "No lo conviertas a jornada completa si el contrato es a tiempo parcial."
+    )
     employee_insurance_exempt = euro_field("Seguro trabajador exento (€/mes)")
     employee_insurance_taxable = euro_field("Seguro trabajador sujeto (€/mes)")
     family_insurance_exempt = euro_field("Seguro familia exento (€/mes)")
