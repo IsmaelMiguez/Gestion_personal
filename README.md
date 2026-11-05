@@ -83,6 +83,8 @@ El reparto base no está conectado todavía a las pantallas. El importe ya corre
 
 ### Primera nómina ordinaria de 2026
 
+Vista de simulación: abre `/payroll/simulation/` desde **Nóminas → Simular nómina**, con una cuenta activa de personal. Introduce manualmente sueldo base anual, pagas, grupo mensual, IRPF, AT/EP y política de redondeo. El resultado muestra bruto y líquido destacados, bases, cuotas de trabajador/empresa y conciliación del neto. Funciona con HTMX y mediante POST normal; no guarda simulaciones ni modifica empleados. Este formulario representa únicamente el supuesto acotado descrito a continuación.
+
 `ordinary_payroll.py` añade `calculate_ordinary_payroll_2026`: mes completo, jornada completa, contrato indefinido ordinario del Régimen General, cotización mensual (grupos 1–7), condiciones constantes y exclusivamente sueldo base. No se aplica a sistemas especiales, pluriempleo, bonificaciones, cotizaciones adicionales por jubilación, incidencias ni conceptos adicionales. El llamador debe comprobar ese alcance antes de usarlo con un empleado. No se ha conectado a empleados ni se han añadido campos o migraciones.
 
 `rules_2026.py` separa bases, tipos y tramos de la fórmula, con referencia a la [Orden PJC/297/2026](https://www.boe.es/buscar/act.php?id=BOE-A-2026-7296), artículos 1–4, 16, 17 y 33. La versión es explícitamente 2026: no sirve como normativa de otros ejercicios. El grupo y el tipo total AT/EP se reciben expresamente; el tipo AT/EP debe verificarse según actividad/ocupación, no se deduce del nombre del puesto. El porcentaje IRPF ya determinado se aplica al bruto pagado, según el [artículo 80 del Reglamento del IRPF](https://www.boe.es/buscar/act.php?id=BOE-A-2007-6820#a80); no calcula ni regulariza dicho porcentaje.

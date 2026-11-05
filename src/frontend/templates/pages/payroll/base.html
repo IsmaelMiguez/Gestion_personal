@@ -11,6 +11,8 @@
     <a class="nav-link {% if request.resolver_match.url_name == 'register' %}active{% endif %}"
        {% if request.resolver_match.url_name == 'register' %}aria-current="page"{% endif %}
        href="{% url 'employees:register' %}">Registrar empleado</a>
+    <a class="nav-link {% if request.resolver_match.url_name == 'simulation' %}active{% endif %}"
+     href="{% url 'employees:simulation' %}" {% if request.resolver_match.url_name == 'simulation' %}aria-current="page"{% endif %}>Simular nómina</a>
   </nav>
   <div id="payroll-content">
     {% block payroll_content %}{% endblock %}

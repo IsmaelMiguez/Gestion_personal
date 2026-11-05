@@ -1,11 +1,12 @@
 from django.urls import path
 
-from . import condition_views, deletion_views, views
+from . import condition_views, deletion_views, payroll_views, views
 
 app_name = "employees"
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path("simulation/", payroll_views.ordinary_payroll, name="simulation"),
     path("employees/", views.employee_list, name="list"),
     path("employees/new/", views.employee_registration, name="register"),
     path("employees/<int:pk>/", views.employee_detail, name="detail"),

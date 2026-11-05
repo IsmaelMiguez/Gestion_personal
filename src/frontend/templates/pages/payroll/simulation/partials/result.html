@@ -1,0 +1,47 @@
+{% load i18n %}
+{% language "es" %}
+<div class="row g-3 mb-4">
+  <div class="col-sm-6"><div class="card bg-dark text-white border-0 rounded-4 h-100"><div class="card-body p-4">
+    <h2 class="h6 text-white-50">Bruto ordinario</h2><p class="h2 mb-0">{{ result.salary.ordinary_payment_amount|floatformat:"2g" }} €</p>
+  </div></div></div>
+  <div class="col-sm-6"><div class="card bg-success-subtle border-success-subtle rounded-4 h-100"><div class="card-body p-4">
+    <h2 class="h6 text-success-emphasis">Líquido a percibir</h2><p class="h2 text-success-emphasis mb-0">{{ result.net_amount|floatformat:"2g" }} €</p>
+  </div></div></div>
+</div>
+<div class="card shadow-sm border-0 rounded-4 mb-4">
+  <div class="card-header bg-primary-subtle py-3"><h2 class="h5 mb-0">2. De sueldo a bases de cotización</h2></div>
+  <div class="card-body"><dl class="row mb-0">
+    <dt class="col-sm-8">Sueldo base anual</dt><dd class="col-sm-4 text-sm-end">{{ result.salary.annual_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Prorrata de extras para cotización</dt><dd class="col-sm-4 text-sm-end">{{ result.extra_payment_accrual|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Base antes de mínimos y máximos</dt><dd class="col-sm-4 text-sm-end">{{ result.uncapped_contribution_base|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Base de contingencias comunes</dt><dd class="col-sm-4 text-sm-end">{{ result.common_contribution_base|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Base de contingencias profesionales</dt><dd class="col-sm-4 text-sm-end">{{ result.professional_contribution_base|floatformat:"2g" }} €</dd>
+  </dl><p class="small text-body-secondary mb-0">La prorrata sirve para cotizar; no se suma al dinero que cobras en esta mensualidad.</p></div>
+</div>
+<div class="card shadow-sm border-0 rounded-4 mb-4">
+  <div class="card-header bg-primary-subtle py-3"><h2 class="h5 mb-0">3. Cuotas de Seguridad Social</h2></div>
+  <div class="table-responsive"><table class="table table-striped align-middle mb-0">
+    <caption class="visually-hidden">Bases, tipos y cuotas por concepto y pagador, en euros</caption>
+    <thead><tr><th scope="col">Concepto</th><th scope="col" class="text-end">Base (€)</th><th scope="col" class="text-end">Trabajador (%)</th><th scope="col" class="text-end">Cuota (€)</th><th scope="col" class="text-end">Empresa (%)</th><th scope="col" class="text-end">Cuota (€)</th></tr></thead>
+    <tbody>{% for line in result.contributions %}<tr>
+      <th scope="row">{{ line.name }}</th><td class="text-end text-nowrap">{{ line.base|floatformat:"2g" }}</td>
+      <td class="text-end">{{ line.employee_rate|floatformat:2 }}</td><td class="text-end text-nowrap">{{ line.employee_amount|floatformat:"2g" }}</td>
+      <td class="text-end">{{ line.employer_rate|floatformat:2 }}</td><td class="text-end text-nowrap">{{ line.employer_amount|floatformat:"2g" }}</td>
+    </tr>{% endfor %}</tbody>
+    <tfoot class="table-primary"><tr><th scope="row" colspan="3">Totales</th><td class="text-end fw-bold">{{ result.employee_contributions|floatformat:"2g" }}</td><td></td><td class="text-end fw-bold">{{ result.employer_contributions|floatformat:"2g" }}</td></tr></tfoot>
+  </table></div>
+</div>
+<div class="card shadow-sm border-0 rounded-4 mb-4">
+  <div class="card-header bg-success-subtle py-3"><h2 class="h5 mb-0">4. Del bruto al líquido</h2></div>
+  <div class="card-body"><dl class="row mb-0">
+    <dt class="col-sm-8">Bruto ordinario</dt><dd class="col-sm-4 text-sm-end">{{ result.salary.ordinary_payment_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">− Seguridad Social del trabajador</dt><dd class="col-sm-4 text-sm-end">{{ result.employee_contributions|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">− IRPF ({{ result.withholding_rate|floatformat:2 }} % del bruto)</dt><dd class="col-sm-4 text-sm-end">{{ result.withholding_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8 text-success-emphasis">Líquido a percibir</dt><dd class="col-sm-4 text-sm-end fw-bold text-success-emphasis">{{ result.net_amount|floatformat:"2g" }} €</dd>
+  </dl></div>
+</div>
+<div class="alert alert-secondary">
+  <p class="mb-1"><strong>Bruto ordinario + cuotas de empresa:</strong> {{ result.employer_cash_cost|floatformat:"2g" }} €. No incluye el devengo de extras pendiente de pago.</p>
+  <p class="mb-0">Diferencia anual de redondeo pendiente de distribuir: {{ result.salary.annual_rounding_difference|floatformat:"2g" }} €.</p>
+</div>
+{% endlanguage %}

@@ -1,0 +1,43 @@
+<section id="simulation-workspace" aria-labelledby="simulation-title">
+  <div class="bg-dark bg-gradient text-white rounded-4 p-4 mb-4 shadow-sm">
+    <span class="badge text-bg-primary mb-2">Simulación · 2026</span>
+    <h1 id="simulation-title" class="h2">Tu nómina, paso a paso</h1>
+    <p class="mb-0 text-white-50">Comprueba una mensualidad ordinaria y consulta de dónde sale cada importe.</p>
+  </div>
+  <div class="alert alert-primary">
+    Mes completo, jornada completa, contrato indefinido del Régimen General y grupos mensuales 1–7.
+    Solo sueldo base: sin complementos, antigüedad, seguros, incidencias, pluriempleo ni bonificaciones.
+    Las extras cotizan mediante prorrata; aquí no se calcula su pago efectivo.
+    Los datos son manuales y no modifican empleados ni se guardan como nóminas.
+  </div>
+  <div class="row g-4">
+    <div class="col-xl-4">
+      <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-header bg-primary-subtle py-3"><h2 class="h5 mb-0">1. Datos del supuesto</h2></div>
+        <div class="card-body">
+          <form method="post" action="{% url 'employees:simulation' %}"
+                hx-post="{% url 'employees:simulation' %}" hx-target="#simulation-workspace" hx-swap="outerHTML"
+                hx-disabled-elt="find button[type='submit']">
+            {% csrf_token %}
+            {% if form.errors %}<div class="alert alert-danger" role="alert">Revisa los campos indicados. {{ form.non_field_errors }}</div>{% endif %}
+            <div class="row">
+              {% for field in form %}{% include "components/form_field.html" with column_class="col-12" %}{% endfor %}
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Calcular nómina</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-8" aria-live="polite" aria-atomic="true">
+      {% if result %}
+        {% include "pages/payroll/simulation/partials/result.html" %}
+      {% else %}
+        <div class="card shadow-sm rounded-4"><div class="card-body p-5 text-center">
+          <span class="badge bg-primary-subtle text-primary-emphasis mb-3">Vista previa</span>
+          <h2 class="h4">{% if form.errors %}Corrige los datos para calcular{% else %}Prepara tu primera simulación{% endif %}</h2>
+          <p class="text-body-secondary mb-0">Introduce sueldo, pagas y tipos. Aquí verás el bruto, las bases, cada deducción y el líquido resultante.</p>
+        </div></div>
+      {% endif %}
+    </div>
+  </div>
+</section>
