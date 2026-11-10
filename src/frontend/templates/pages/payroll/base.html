@@ -14,6 +14,7 @@
     <a class="nav-link {% if request.resolver_match.url_name == 'simulation' %}active{% endif %}"
      href="{% url 'employees:simulation' %}" {% if request.resolver_match.url_name == 'simulation' %}aria-current="page"{% endif %}>Simular nómina</a>
     <a class="nav-link {% if request.resolver_match.url_name == 'calculation' %}active{% endif %}" href="{% url 'employees:calculation' %}" {% if request.resolver_match.url_name == 'calculation' %}aria-current="page"{% endif %}>Calcular nóminas</a>
+    <a class="nav-link {% if request.resolver_match.url_name == 'company-register' %}active{% endif %}" href="{% url 'employees:company-register' %}" {% if request.resolver_match.url_name == 'company-register' %}aria-current="page"{% endif %}>Registrar empresa</a>
   </nav>
   <div id="payroll-content">
     {% block payroll_content %}{% endblock %}

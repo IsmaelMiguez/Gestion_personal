@@ -2,7 +2,12 @@ from decimal import Decimal
 
 from django import forms
 
-from .models import Employee, EmploymentCondition, EmploymentRelationship
+from .models import (
+    Company,
+    Employee,
+    EmploymentCondition,
+    EmploymentRelationship,
+)
 
 
 def euro_field(label):
@@ -94,6 +99,16 @@ class BootstrapFormMixin:
                 if isinstance(field.widget, forms.Select)
                 else "form-control"
             )
+
+
+class CompanyForm(BootstrapFormMixin, forms.ModelForm):
+    class Meta:
+        model = Company
+        fields = ("name", "tax_id")
+        labels = {
+            "name": "Nombre de la empresa",
+            "tax_id": "Identificación fiscal (NIF)",
+        }
 
 
 class EmployeeForm(BootstrapFormMixin, forms.ModelForm):

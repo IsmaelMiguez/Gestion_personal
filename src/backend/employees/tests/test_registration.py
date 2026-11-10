@@ -146,7 +146,8 @@ class EmployeeRegistrationTests(TestCase):
     def test_registration_without_company_explains_required_first_step(self):
         self.company.delete()
         response = self.client.get(self.url)
-        self.assertContains(response, "crea su empresa")
+        self.assertContains(response, "registra su empresa")
+        self.assertContains(response, reverse("employees:company-register"))
         self.assertContains(response, 'type="submit" disabled')
 
     def test_registration_requires_staff_and_csrf(self):

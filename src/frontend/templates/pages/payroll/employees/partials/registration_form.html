@@ -14,9 +14,7 @@
   </nav>
   {% if not has_companies %}
     <div class="alert alert-info" role="status">
-      Antes de registrar un empleado, crea su empresa en
-      <a class="alert-link" href="{% url 'admin:employees_company_add' %}" target="_blank" rel="noopener">Administración</a>.
-      Después vuelve a abrir este formulario.
+      Antes de registrar un empleado, <a class="alert-link" href="{% url 'employees:company-register' %}">registra su empresa</a>.
     </div>
   {% endif %}
   <form method="post" action="{% url 'employees:register' %}"
@@ -49,6 +47,7 @@
       <div class="row">
         {% for field in relationship_form %}{% include "components/form_field.html" with field=field only %}{% endfor %}
       </div>
+      <p class="form-text">¿Falta la empresa? <a href="{% url 'employees:company-register' %}">Registrar empresa</a> antes de completar este formulario.</p>
       <p class="form-text mb-0">Las fechas de fin son opcionales y excluyen ese día del periodo. La fecha de antigüedad puede ser anterior al inicio del contrato.</p>
       </div>
     </fieldset>

@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import (
+    company_views,
     condition_views,
     deletion_views,
     payroll_report_views,
@@ -12,6 +13,11 @@ app_name = "employees"
 
 urlpatterns = [
     path("", views.home, name="home"),
+    path(
+        "companies/new/",
+        company_views.company_registration,
+        name="company-register",
+    ),
     path("simulation/", payroll_views.ordinary_payroll, name="simulation"),
     path(
         "calculation/", payroll_report_views.payroll_report, name="calculation"
