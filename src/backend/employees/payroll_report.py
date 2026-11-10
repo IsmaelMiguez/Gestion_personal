@@ -14,6 +14,7 @@ from payroll_engine.ordinary_payroll import calculate_ordinary_payroll_2026
 
 from .payroll_columns import COLUMNS
 from .payroll_report_values import result_cells, value_cell
+from .payroll_seniority import seniority_cells
 
 
 def _text(value):
@@ -98,7 +99,7 @@ def _scope_reasons(relationship, condition, start, end, year):
     )
     if years >= 2:
         reasons.append(
-            "Debe integrarse la antigüedad aplicable antes de calcular el total de esta nómina."
+            "La antigüedad mensual se presenta por separado; falta integrarla en extras, cotizaciones y totales de nómina."
         )
     return reasons
 
@@ -167,6 +168,15 @@ def report_row(relationship, year, month, rounding):
             values.update(salary_values)
             if error:
                 reasons.append(error)
+            seniority_values, seniority_error = seniority_cells(
+                relationship, condition, salary, start, rounding
+            )
+            values.update(seniority_values)
+            if seniority_error:
+                reasons.append(seniority_error)
+                for code in ("G", "P"):
+                    if code not in seniority_values:
+                        values[code] = _pending(code, seniority_error)
             for code, name in zip(
                 ("Q", "R", "S", "T", "U"),
                 condition.money_fields[1:],

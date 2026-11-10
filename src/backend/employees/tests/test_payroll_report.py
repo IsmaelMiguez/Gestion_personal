@@ -19,6 +19,60 @@ from ..payroll_report import report_row
 
 
 class PayrollReportTests(TestCase):
+    def test_seniority_cells_and_detail_include_insurances_but_not_fixed_supplement(
+        self,
+    ):
+        self.relationship.seniority_date = date(2011, 1, 1)
+        self.relationship.save()
+        self.condition.employee_insurance_exempt_cents = 1000
+        self.condition.employee_insurance_taxable_cents = 2000
+        self.condition.family_insurance_exempt_cents = 3000
+        self.condition.family_insurance_taxable_cents = 4000
+        self.condition.fixed_supplement_cents = 50000
+        self.condition.save()
+        response = self.client.post(self.url, self.values)
+        cells = {
+            cell["code"]: cell for cell in response.context["rows"][0]["cells"]
+        }
+        self.assertEqual(cells["G"]["value"], Decimal(35))
+        self.assertEqual(cells["P"]["value"], Decimal(735))
+        self.assertFalse(cells["CA"]["available"])
+        response = self.client.post(
+            self.url,
+            {**self.values, "cell": cells["P"]["key"]},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertContains(response, "735,00")
+        self.assertContains(response, "base = 2100.00")
+
+    def test_unknown_insurance_preserves_rate_and_mid_month_change_preserves_neither(
+        self,
+    ):
+        self.relationship.seniority_date = date(2024, 1, 1)
+        self.relationship.save()
+        self.condition.employee_insurance_exempt_cents = None
+        self.condition.save()
+        cells = {
+            cell["code"]: cell
+            for cell in report_row(self.relationship, 2026, 1, ROUND_HALF_UP)[
+                "cells"
+            ]
+        }
+        self.assertTrue(cells["G"]["available"])
+        self.assertFalse(cells["P"]["available"])
+        self.assertIn("seguros", cells["P"]["note"])
+        self.relationship.seniority_date = date(2024, 1, 15)
+        self.relationship.save()
+        cells = {
+            cell["code"]: cell
+            for cell in report_row(self.relationship, 2026, 1, ROUND_HALF_UP)[
+                "cells"
+            ]
+        }
+        for code in ("G", "P"):
+            self.assertFalse(cells[code]["available"])
+            self.assertIn("fecha de efectos", cells[code]["note"])
+
     def setUp(self):
         self.user = get_user_model().objects.create_user(
             username="report-staff", is_staff=True

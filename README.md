@@ -139,3 +139,14 @@ Los conceptos no implementados permanecen **Pendientes**, con el motivo en su de
 Para los totales hacen falta sueldo/pagas, IRPF, grupo y AT/EP. Seguros y complemento fijo deben estar informados explícitamente con 0 para el caso base. Si faltan, son distintos de cero, hay antigüedad de dos años o más durante el mes, cambios dentro del mes o un ejercicio/régimen no soportado, los totales quedan pendientes; los datos de contrato que sí se conocen se muestran con su origen. Extras efectivamente pagadas, antigüedad, ajustes, NCM, INSS y controles del Excel necesitan sus siguientes incrementos de cálculo. El selector completo no implica que el motor ya implemente todas esas reglas.
 
 Pruebas de esta vista: `uv run python src/manage.py test backend.employees.tests.test_payroll_report`.
+
+
+## Antigüedad: primer incremento
+
+`src/payroll_engine/seniority.py` implementa el perfil inicial expresamente acordado: 0–1 años 0 %, 2–3 5 %, 4–5 10 %, 6–7 15 %, 8–9 20 %, 10–14 25 %, 15 35 %, 16–19 40 %, 20–21 50 %, 22–23 55 % y 24 o más 60 %. No se presenta como regla universal de todos los convenios.
+
+La pantalla **Calcular nóminas** muestra G (porcentaje) y P (importe mensual), con detalle de su origen. P = (sueldo base por paga ordinaria + los cuatro seguros mensuales registrados) × porcentaje / 100. El complemento fijo no se incluye. Los importes ya pertenecen a la jornada habitual y no se aplica otra reducción por jornada. Un seguro sin informar no se sustituye por cero: puede conocerse G, pero P queda pendiente hasta informar los cuatro seguros.
+
+Solo se asigna un porcentaje mensual cuando es estable durante todo el mes. Un cambio de tramo dentro del mes queda pendiente de acordar su fecha de efectos; los aniversarios que no alteran el porcentaje congelado no bloquean el cálculo. Los aniversarios del 29 de febrero requieren una regla en años no bisiestos cuando pueda cambiar el tramo. Fechas futuras respecto al inicio del mes y cantidades inválidas se rechazan explícitamente.
+
+Este incremento muestra la antigüedad por separado. No se introduce todavía en extras, bases, cuotas o líquido: los totales con antigüedad permanecen pendientes hasta definir su integración. No requiere migraciones ni nuevas dependencias.
