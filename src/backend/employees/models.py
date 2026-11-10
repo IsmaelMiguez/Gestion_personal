@@ -145,6 +145,23 @@ class EmploymentCondition(models.Model):
     job_title = models.CharField(
         "puesto de trabajo", max_length=150, blank=True
     )
+    contribution_group = models.PositiveSmallIntegerField(
+        "grupo de cotización",
+        null=True,
+        blank=True,
+        choices=[(number, f"Grupo {number}") for number in range(1, 12)],
+    )
+    occupational_risk_rate = models.DecimalField(
+        "tipo total AT/EP (%)",
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[
+            MinValueValidator(Decimal(0)),
+            MaxValueValidator(Decimal(100)),
+        ],
+    )
     salary_amount_cents = models.PositiveBigIntegerField(
         "importe salarial (céntimos)",
         null=True,
@@ -204,6 +221,21 @@ class EmploymentCondition(models.Model):
         verbose_name = "condición laboral"
         verbose_name_plural = "condiciones laborales"
         constraints = [
+            models.CheckConstraint(
+                condition=models.Q(contribution_group__isnull=True)
+                | models.Q(
+                    contribution_group__gte=1, contribution_group__lte=11
+                ),
+                name="condition_valid_contribution_group",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(occupational_risk_rate__isnull=True)
+                | models.Q(
+                    occupational_risk_rate__gte=0,
+                    occupational_risk_rate__lte=100,
+                ),
+                name="condition_valid_occupational_rate",
+            ),
             models.CheckConstraint(
                 condition=models.Q(valid_until__isnull=True)
                 | models.Q(valid_until__gt=models.F("valid_from")),

@@ -13,6 +13,7 @@
        href="{% url 'employees:register' %}">Registrar empleado</a>
     <a class="nav-link {% if request.resolver_match.url_name == 'simulation' %}active{% endif %}"
      href="{% url 'employees:simulation' %}" {% if request.resolver_match.url_name == 'simulation' %}aria-current="page"{% endif %}>Simular nómina</a>
+    <a class="nav-link {% if request.resolver_match.url_name == 'calculation' %}active{% endif %}" href="{% url 'employees:calculation' %}" {% if request.resolver_match.url_name == 'calculation' %}aria-current="page"{% endif %}>Calcular nóminas</a>
   </nav>
   <div id="payroll-content">
     {% block payroll_content %}{% endblock %}

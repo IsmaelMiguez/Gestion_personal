@@ -1,0 +1,51 @@
+<section id="calculation-workspace" aria-labelledby="calculation-title">
+  <header class="bg-dark bg-gradient text-white rounded-4 shadow-sm p-4 mb-4">
+    <span class="badge text-bg-primary mb-2">Cálculo por empresa y periodo</span>
+    <h1 class="h2" id="calculation-title">Nóminas en una sola tabla</h1>
+    <p class="text-white-50 mb-0">Selecciona personas, periodos y conceptos. Pulsa cualquier celda para consultar su detalle.</p>
+  </header>
+  <div class="alert alert-primary">El cálculo ordinario disponible corresponde a 2026, mes completo y jornada completa en Régimen General con contrato indefinido. Los conceptos sin reglas o datos suficientes se muestran pendientes. La consulta no guarda ni modifica nóminas.</div>
+  <form id="report-filters" method="post" action="{% url 'employees:calculation' %}"
+        hx-post="{% url 'employees:calculation' %}" hx-target="#calculation-workspace" hx-swap="outerHTML"
+        hx-disabled-elt="find button[type='submit']">
+    {% csrf_token %}
+    {% if form.errors %}<div class="alert alert-danger" role="alert">Revisa los filtros:
+      {{ form.non_field_errors }}{% for field in form %}{% if field.errors %}<p class="mb-1"><strong>{{ field.label }}:</strong> {{ field.errors|striptags }}</p>{% endif %}{% endfor %}
+    </div>{% endif %}
+    <div class="row g-3 mb-3">
+      <div class="col-lg-4"><fieldset class="card shadow-sm h-100"><legend class="float-none w-100 h6 bg-primary-subtle p-3 mb-0">1. Empresas</legend><div class="card-body" id="company-options"
+          hx-get="{% url 'employees:calculation-workers' %}" hx-trigger="change" hx-target="#worker-options"
+          hx-include="[name='companies'], [name='employees']" hx-sync="this:replace">
+        {% for choice in form.companies %}<div class="form-check">{{ choice.tag }}<label class="form-check-label" for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label></div>{% empty %}<p>No hay empresas. Regístralas desde Administración.</p>{% endfor %}
+      </div><div class="card-footer"><button type="submit" class="btn btn-outline-primary btn-sm" name="load_workers" value="1" formnovalidate>Actualizar trabajadores</button></div></fieldset></div>
+      <div class="col-lg-4"><fieldset class="card shadow-sm h-100"><legend class="float-none w-100 h6 bg-primary-subtle p-3 mb-0">2. Trabajadores</legend>
+        <div class="card-body" id="worker-options">{% include "pages/payroll/calculation/partials/workers.html" %}</div>
+      </fieldset></div>
+      <div class="col-lg-4"><fieldset class="card shadow-sm h-100"><legend class="float-none w-100 h6 bg-primary-subtle p-3 mb-0">3. Periodos</legend><div class="card-body">
+        <label class="form-label" for="{{ form.years.id_for_label }}">Años</label>{{ form.years }}
+        <p class="form-text">Puedes seleccionar varios años; los ejercicios sin normativa aparecerán pendientes.</p>
+        <div id="month-options"><button class="btn btn-outline-secondary btn-sm mb-2" type="button" data-check-all="month-options">Todos</button> <button class="btn btn-link btn-sm mb-2" type="button" data-uncheck-all="month-options">Ninguno</button>
+          <div class="row">{% for choice in form.months %}<div class="col-6"><div class="form-check">{{ choice.tag }}<label class="form-check-label" for="{{ choice.id_for_label }}">{{ choice.choice_label }}</label></div></div>{% endfor %}</div>
+        </div>
+      </div></fieldset></div>
+    </div>
+    <div class="card shadow-sm mb-3"><div class="card-header bg-primary-subtle d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <h2 class="h6 mb-0">4. Campos del Excel · 90 columnas</h2>
+      <div><button class="btn btn-outline-primary btn-sm" type="button" data-check-all="column-options">Todos los campos</button> <button class="btn btn-outline-secondary btn-sm" type="button" data-uncheck-all="column-options">Ninguno</button></div>
+    </div><div class="card-body" id="column-options">
+      <p class="small text-body-secondary">Los códigos A–CL corresponden a CALCULO_2026. El porcentaje contractual se muestra como porcentaje, no como fracción. Seleccionar un campo no implica que su regla esté implementada.</p>
+      {% for name, choices in column_groups %}<details class="border rounded-3 mb-2"><summary class="p-3 fw-semibold bg-body-tertiary">{{ name }}</summary><div class="row g-2 p-3">
+        {% for choice in choices %}<div class="col-md-6 col-xl-4"><div class="form-check">{{ choice.tag }}<label class="form-check-label small" for="{{ choice.id_for_label }}">{{ choice.data.value }} · {{ choice.choice_label }}</label></div></div>{% endfor %}
+      </div></details>{% endfor %}
+    </div></div>
+    <div class="card card-body shadow-sm mb-4">
+      <div class="row"><div class="col-lg-6">{% include "components/form_field.html" with field=form.rounding column_class="col-12" %}</div>
+      <div class="col-lg-6"><div class="form-check mb-3">{{ form.base_only }}<label class="form-check-label" for="{{ form.base_only.id_for_label }}">{{ form.base_only.label }}</label></div><p class="form-text">{{ form.base_only.help_text }}</p></div></div>
+      <div><button class="btn btn-primary" type="submit">Calcular tabla</button></div>
+    </div>
+  </form>
+  <div id="report-output">
+    {% include "pages/payroll/calculation/partials/table.html" %}
+    <div id="calculation-detail" class="mt-4" aria-live="polite" tabindex="-1">{% include "pages/payroll/calculation/partials/detail.html" %}</div>
+  </div>
+</section>

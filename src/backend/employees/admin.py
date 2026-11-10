@@ -72,6 +72,8 @@ class EmploymentConditionAdmin(ValidatedAdmin):
                     "working_time_percentage",
                     "social_security_regime",
                     "collective_agreement",
+                    "contribution_group",
+                    "occupational_risk_rate",
                 ),
             },
         ),

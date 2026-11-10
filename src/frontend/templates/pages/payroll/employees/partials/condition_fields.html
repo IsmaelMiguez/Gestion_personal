@@ -11,6 +11,8 @@
         {% include "components/form_field.html" with field=condition_form.working_time_percentage only %}
         {% include "components/form_field.html" with field=condition_form.social_security_regime only %}
         {% include "components/form_field.html" with field=condition_form.collective_agreement only %}
+        {% include "components/form_field.html" with field=condition_form.contribution_group only %}
+        {% include "components/form_field.html" with field=condition_form.occupational_risk_rate only %}
         {% include "components/form_field.html" with field=condition_form.valid_from only %}
         {% if condition_form.valid_until %}{% include "components/form_field.html" with field=condition_form.valid_until only %}{% endif %}
       </div>

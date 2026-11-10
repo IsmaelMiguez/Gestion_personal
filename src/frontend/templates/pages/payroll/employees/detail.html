@@ -67,6 +67,8 @@
                   <dt class="small text-body-secondary fw-normal">Modalidad contractual</dt><dd>{{ item.condition.contract_type }}</dd>
                   <dt class="small text-body-secondary fw-normal">Régimen</dt><dd>{{ item.condition.social_security_regime }}</dd>
                   <dt class="small text-body-secondary fw-normal">Convenio</dt><dd>{{ item.condition.collective_agreement }}</dd>
+                  <dt class="small text-body-secondary fw-normal">Grupo de cotización</dt><dd>{{ item.condition.contribution_group|default_if_none:"Sin informar" }}</dd>
+                  <dt class="small text-body-secondary fw-normal">AT/EP (%)</dt><dd>{{ item.condition.occupational_risk_rate|default_if_none:"Sin informar" }}</dd>
                 </dl>
               </div>
               <div class="col-lg-7">

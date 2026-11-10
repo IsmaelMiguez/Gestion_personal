@@ -1,0 +1,17 @@
+{% load i18n %}{% language "es" %}
+{% if detail %}
+  <article class="card border-primary shadow-sm rounded-4">
+    <div class="card-header bg-primary-subtle p-3"><span class="badge text-bg-primary mb-2">Celda {{ detail.code }}</span><h2 class="h5 mb-0">{{ detail.label }}</h2></div>
+    <div class="card-body p-4">
+      <p class="text-body-secondary">{{ detail.company }} · {{ detail.employee }} · {{ detail.period }}</p>
+      <p class="h3 {% if not detail.available %}text-warning-emphasis{% else %}text-primary{% endif %}">{% if detail.value|floatformat:"2g" %}{{ detail.value|floatformat:"2g" }}{% else %}{{ detail.value }}{% endif %}</p>
+      <dl><dt>Fórmula u origen</dt><dd>{{ detail.formula }}</dd>
+      {% if detail.operands %}<dt>Valores utilizados</dt><dd class="font-monospace text-break">{{ detail.operands }}</dd>{% endif %}
+      <dt>Regla y observaciones</dt><dd>{{ detail.note }}</dd>
+      <dt>Política de redondeo seleccionada</dt><dd>{{ detail.rounding }} · importes a céntimos cuando corresponda</dd></dl>
+      <p class="small text-body-secondary mb-0">Detalle recalculado con los filtros y datos actuales. Los campos monetarios se expresan en euros y los tipos en porcentaje.</p>
+    </div>
+  </article>
+{% elif form.errors %}<div class="alert alert-warning" role="alert">Los filtros han cambiado o contienen errores. Vuelve a calcular la tabla antes de abrir una celda.</div>
+{% else %}<div class="alert alert-light border">Pulsa una celda para ver su fórmula, valores y observaciones.</div>{% endif %}
+{% endlanguage %}

@@ -118,3 +118,24 @@ PY
 ```
 
 Los tipos IRPF y AT/EP del ejemplo son entradas ilustrativas, no valores predeterminados ni una recomendación para un empleado concreto. Resultado: bruto 2.000,00 €, prorrata 333,33 €, cuota trabajador 151,67 €, cuota empresa 750,17 €, IRPF 300,00 € y líquido 1.548,33 €. Para partir de una cantidad mensual puede obtenerse el anual mediante `base_salary_from_monthly`; no se transforma a jornada completa.
+
+
+## Cálculo por empresas y periodos
+
+Abre **Nóminas → Calcular nóminas** (`/payroll/calculation/`). Antes del primer uso aplica la migración aditiva:
+
+```bash
+uv run python src/manage.py migrate
+```
+
+Las condiciones laborales incorporan grupo de cotización (1–11) y tipo total AT/EP (%), ambos opcionales para conservar los registros existentes sin inventar valores. Se editan al registrar/cambiar condiciones y desde Administración, y se exponen en la API. La base de datos limita los valores admitidos.
+
+Selecciona empresas, sus trabajadores, años/meses y conceptos. Los trabajadores se actualizan con HTMX; el botón **Actualizar trabajadores** ofrece la alternativa mediante POST normal. Hay selección de todos/ninguno para trabajadores, meses y campos. Las 90 columnas de `CALCULO_2026` se conservan como catálogo estático A–CL, agrupadas por conceptos; no se necesita abrir el Excel para utilizar la aplicación. La consulta admite hasta 240 filas. No se guardan nóminas ni se modifican empleados.
+
+Cada fila identifica empresa, trabajador, relación laboral y mes. Se consultan las condiciones que cubren ese mes completo y se reutiliza el motor ordinario. Pulsa una celda para abrir la card con valor, fórmula/origen, operandos, regla y redondeo. Las tarjetas se obtienen de los mismos resultados que la tabla; si cambian los filtros hay que recalcular. Los importes son euros y los tipos son porcentajes (en particular F muestra 100, no la fracción 1 del Excel).
+
+Los conceptos no implementados permanecen **Pendientes**, con el motivo en su detalle. No se copian los importes sintéticos del libro. La primera versión calcula el caso ordinario de 2026: mes completo, jornada completa, Régimen General, contrato indefinido ordinario y grupos mensuales 1–7. El formulario exige declarar ausencia de incidencias, bonus, pluriempleo, bonificaciones y cotizaciones especiales. No se deduce esa ausencia de los datos del contrato.
+
+Para los totales hacen falta sueldo/pagas, IRPF, grupo y AT/EP. Seguros y complemento fijo deben estar informados explícitamente con 0 para el caso base. Si faltan, son distintos de cero, hay antigüedad de dos años o más durante el mes, cambios dentro del mes o un ejercicio/régimen no soportado, los totales quedan pendientes; los datos de contrato que sí se conocen se muestran con su origen. Extras efectivamente pagadas, antigüedad, ajustes, NCM, INSS y controles del Excel necesitan sus siguientes incrementos de cálculo. El selector completo no implica que el motor ya implemente todas esas reglas.
+
+Pruebas de esta vista: `uv run python src/manage.py test backend.employees.tests.test_payroll_report`.

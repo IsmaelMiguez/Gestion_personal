@@ -119,6 +119,8 @@ class EmploymentConditionSerializer(ValidatedModelSerializer):
             "social_security_regime",
             "collective_agreement",
             "job_title",
+            "contribution_group",
+            "occupational_risk_rate",
             "salary_amount",
             "salary_period",
             "payments_per_year",

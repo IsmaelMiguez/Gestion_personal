@@ -1,0 +1,7 @@
+{% extends "pages/payroll/base.html" %}
+{% load static %}
+{% block title %}Calcular nóminas · RRHH Tool{% endblock %}
+{% block payroll_content %}
+  {% include "pages/payroll/calculation/partials/workspace.html" %}
+  <script src="{% static 'payroll/report.js' %}" defer></script>
+{% endblock %}
