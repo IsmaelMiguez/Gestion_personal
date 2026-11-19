@@ -1,0 +1,178 @@
+from datetime import date
+from decimal import ROUND_HALF_UP, Decimal, Inexact, localcontext
+
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+
+from ..models import (
+    Company,
+    Employee,
+    EmploymentCondition,
+    EmploymentRelationship,
+)
+from ..payroll_semester import semester_extra
+
+
+class SemesterExtraReportTests(TestCase):
+    def setUp(self):
+        self.company = Company.objects.create(
+            name="Empresa", tax_id="SEMESTER"
+        )
+        self.employee = Employee.objects.create(
+            internal_code="SEMESTER",
+            first_name="Alex",
+            last_name="Example",
+            birth_date=date(1990, 1, 1),
+        )
+        self.relationship = EmploymentRelationship.objects.create(
+            company=self.company,
+            employee=self.employee,
+            start_date=date(2026, 1, 1),
+            seniority_date=date(2026, 1, 1),
+        )
+        self.condition = EmploymentCondition.objects.create(
+            employment_relationship=self.relationship,
+            valid_from=date(2026, 1, 1),
+            contract_type="Indefinido",
+            social_security_regime="Régimen General",
+            collective_agreement="Prueba",
+            working_time_percentage=100,
+            salary_amount_cents=200000,
+            salary_period="MONTHLY",
+            payments_per_year=14,
+            employee_insurance_exempt_cents=0,
+            employee_insurance_taxable_cents=0,
+            family_insurance_exempt_cents=0,
+            family_insurance_taxable_cents=0,
+        )
+
+    def test_complete_history_uses_previous_conditions_without_per_month_queries(
+        self,
+    ):
+        self.condition.valid_until = date(2026, 4, 1)
+        self.condition.save()
+        self.condition.pk = None
+        self.condition.valid_from = date(2026, 4, 1)
+        self.condition.valid_until = None
+        self.condition.salary_amount_cents = 240000
+        self.condition.save()
+        with self.assertNumQueries(1):
+            report = semester_extra(
+                self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 7, 1)
+            )
+        self.assertEqual(report["result"].amount, Decimal(2200))
+        self.assertEqual(
+            [row["base_salary"] for row in report["rows"]],
+            [Decimal(2000)] * 3 + [Decimal(2400)] * 3,
+        )
+        self.assertFalse(report["projected"])
+
+    def test_seniority_step_on_first_day_uses_each_months_amount(self):
+        self.relationship.seniority_date = date(2011, 5, 1)
+        self.relationship.save()
+        report = semester_extra(
+            self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 7, 1)
+        )
+        self.assertEqual(report["result"].amount, Decimal("2566.67"))
+        self.assertEqual(
+            [row["seniority"] for row in report["rows"]],
+            [Decimal(500)] * 4 + [Decimal(700)] * 2,
+        )
+
+    def test_uncovered_or_ambiguous_month_prevents_partial_total(self):
+        self.condition.valid_until = date(2026, 3, 15)
+        self.condition.save()
+        report = semester_extra(
+            self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 7, 1)
+        )
+        self.assertIsNone(report["result"])
+        self.assertEqual(len(report["rows"]), 6)
+        self.assertIn("todo el mes", report["rows"][2]["issue"])
+        self.assertTrue(all("accrued" not in row for row in report["rows"]))
+        self.relationship.start_date = date(2026, 1, 15)
+        report = semester_extra(
+            self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 7, 1)
+        )
+        self.assertIn("Alta/baja", report["rows"][0]["issue"])
+
+    def test_unresolved_seniority_unknown_insurance_and_payment_transition_remain_pending(
+        self,
+    ):
+        self.relationship.seniority_date = date(2024, 3, 15)
+        self.relationship.save()
+        report = semester_extra(
+            self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 7, 1)
+        )
+        self.assertIsNone(report["result"])
+        self.assertIn("fecha de efectos", report["rows"][2]["issue"])
+        self.relationship.seniority_date = date(2026, 1, 1)
+        self.relationship.save()
+        self.condition.employee_insurance_exempt_cents = None
+        self.condition.save()
+        report = semester_extra(
+            self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 7, 1)
+        )
+        self.assertIsNone(report["result"])
+        self.assertIn("seguros", report["rows"][0]["issue"])
+        self.condition.employee_insurance_exempt_cents = 0
+        self.condition.valid_until = date(2026, 4, 1)
+        self.condition.save()
+        self.condition.pk = None
+        self.condition.valid_from = date(2026, 4, 1)
+        self.condition.valid_until = None
+        self.condition.payments_per_year = 12
+        self.condition.save()
+        report = semester_extra(
+            self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 7, 1)
+        )
+        self.assertIsNone(report["result"])
+        self.assertIn("12 y 14", report["issues"][0])
+
+    def test_second_semester_projection_and_decimal_context(self):
+        with localcontext() as context:
+            context.prec = 3
+            context.traps[Inexact] = True
+            report = semester_extra(
+                self.relationship, 2026, 7, ROUND_HALF_UP, date(2026, 11, 19)
+            )
+            self.assertEqual(report["result"].amount, Decimal(2000))
+            self.assertTrue(report["projected"])
+            self.assertEqual(report["result"].payment_month, date(2026, 12, 1))
+            self.assertEqual(context.prec, 3)
+
+    def test_view_deduplicates_semesters_and_attaches_detail_to_column_i(self):
+        user = get_user_model().objects.create_user(
+            username="semester-staff", is_staff=True
+        )
+        self.client.force_login(user)
+        values = {
+            "companies": [self.company.pk],
+            "employees": [self.employee.pk],
+            "years": ["2026"],
+            "months": ["1", "2", "7", "12"],
+            "columns": ["I"],
+            "rounding": ROUND_HALF_UP,
+            "base_only": "on",
+        }
+        url = reverse("employees:calculation")
+        response = self.client.post(url, values)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["semester_extras"]), 2)
+        self.assertEqual(
+            len(response.context["semester_extras"][0]["rows"]), 6
+        )
+        self.assertContains(response, "Extra de Julio 2026")
+        self.assertContains(response, "Extra de Diciembre 2026")
+        response = self.client.post(
+            url,
+            {**values, "cell": f"{self.relationship.pk}:2026:1:I"},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertContains(response, "Extra de Julio 2026")
+        self.assertContains(response, "06/2026")
+        self.assertNotContains(response, "<!doctype html>")
+        self.assertEqual(EmploymentCondition.objects.count(), 1)
+        response = self.client.post(url, {**values, "months": ["7"]})
+        self.assertEqual(len(response.context["semester_extras"]), 2)
+        self.assertContains(response, "Extra de Julio 2026")

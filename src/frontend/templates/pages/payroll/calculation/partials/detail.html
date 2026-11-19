@@ -9,6 +9,7 @@
       {% if detail.operands %}<dt>Valores utilizados</dt><dd class="font-monospace text-break">{{ detail.operands }}</dd>{% endif %}
       <dt>Regla y observaciones</dt><dd>{{ detail.note }}</dd>
       <dt>Política de redondeo seleccionada</dt><dd>{{ detail.rounding }} · importes a céntimos cuando corresponda</dd></dl>
+      {% if detail.semester_extra %}{% include "pages/payroll/calculation/partials/semester_extra.html" with extra=detail.semester_extra only %}{% endif %}
       <p class="small text-body-secondary mb-0">Detalle recalculado con los filtros y datos actuales. Los campos monetarios se expresan en euros y los tipos en porcentaje.</p>
     </div>
   </article>

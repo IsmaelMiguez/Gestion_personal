@@ -1,3 +1,4 @@
+from datetime import date
 from itertools import groupby
 
 from django import forms
@@ -13,6 +14,7 @@ from .models import EmploymentCondition, EmploymentRelationship
 from .payroll_columns import COLUMNS, column_group
 from .payroll_report import report_row
 from .payroll_report_forms import PayrollReportForm
+from .payroll_semester import semester_extra
 
 
 @never_cache
@@ -36,6 +38,7 @@ def payroll_report(request):
     rows = []
     selected_columns = []
     detail = None
+    semester_extras = []
     cell_key = request.POST.get("cell", "")
     if request.method == "POST" and not refreshing and form.is_valid():
         data = form.cleaned_data
@@ -72,6 +75,22 @@ def payroll_report(request):
             relationships = []
         for relationship in relationships:
             for year in sorted(data["years"]):
+                first_months = {
+                    1 if month <= 6 else 7 for month in data["months"]
+                }
+                if 7 in data["months"]:
+                    first_months.add(1)
+                semesters = {
+                    first: semester_extra(
+                        relationship,
+                        year,
+                        first,
+                        data["rounding"],
+                        date.today(),
+                    )
+                    for first in sorted(first_months)
+                }
+                semester_extras.extend(semesters.values())
                 for month in sorted(data["months"]):
                     row = report_row(
                         relationship, year, month, data["rounding"]
@@ -83,6 +102,10 @@ def payroll_report(request):
                     ]
                     rows.append(row)
                     for cell in row["cells"]:
+                        if cell["code"] == "I":
+                            cell["semester_extra"] = semesters[
+                                1 if month <= 6 else 7
+                            ]
                         if cell["key"] == cell_key:
                             detail = cell
         if len(rows) > 240:
@@ -91,6 +114,7 @@ def payroll_report(request):
                 "Hay más de 240 filas: reduce los trabajadores o los periodos.",
             )
             rows = []
+            semester_extras = []
             detail = None
         if cell_key and detail is None:
             form.add_error(
@@ -110,6 +134,7 @@ def payroll_report(request):
         "columns": selected_columns,
         "column_groups": groups,
         "detail": detail,
+        "semester_extras": semester_extras,
     }
     if request.htmx and cell_key and not request.htmx.history_restore_request:
         return render(

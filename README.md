@@ -149,7 +149,7 @@ La pantalla **Calcular nóminas** muestra G (porcentaje) y P (importe mensual), 
 
 Solo se asigna un porcentaje mensual cuando es estable durante todo el mes. Un cambio de tramo dentro del mes queda pendiente de acordar su fecha de efectos; los aniversarios que no alteran el porcentaje congelado no bloquean el cálculo. Los aniversarios del 29 de febrero requieren una regla en años no bisiestos cuando pueda cambiar el tramo. Fechas futuras respecto al inicio del mes y cantidades inválidas se rechazan explícitamente.
 
-Este incremento muestra la antigüedad por separado. No se introduce todavía en extras, bases, cuotas o líquido: los totales con antigüedad permanecen pendientes hasta definir su integración. No requiere migraciones ni nuevas dependencias.
+La antigüedad alimenta la referencia de extras y su devengo semestral. Su incorporación a bases, cuotas y líquido sigue pendiente: los totales de nómina con antigüedad no se presentan como completos. No requiere migraciones ni nuevas dependencias.
 
 
 ## Composición de las pagas extraordinarias
@@ -160,4 +160,17 @@ Confirmado por el usuario: **solo sueldo base y antigüedad**. Los cuatro seguro
 
 En **Calcular nóminas**, la columna I y su tarjeta muestran esa prorrata y los operandos, incluso cuando otras partidas de la nómina siguen pendientes. Si no se conoce la antigüedad, la referencia de 14 pagas queda pendiente. En 12 pagas la ausencia de prorrata adicional se conoce independientemente de las partidas monetarias pendientes.
 
-Este incremento no calcula el pago efectivo de julio/diciembre ni certifica el devengo histórico de un semestre: aún deben resolverse altas/bajas, incidencias y cambios de condiciones o de tramo. Tampoco incorpora la antigüedad a los totales de SS/IRPF/neto todavía; los totales incompletos permanecen pendientes. No requiere migraciones ni dependencias nuevas.
+La referencia de la columna I no sustituye el devengo semestral que se muestra aparte, ni registra un pago efectivo. Las altas/bajas, incidencias y cambios dentro del mes siguen pendientes. Tampoco incorpora la antigüedad a los totales de SS/IRPF/neto todavía; los totales incompletos permanecen pendientes. No requiere migraciones ni dependencias nuevas.
+
+
+## Devengo semestral de extras
+
+Tras calcular la tabla aparece **Devengo semestral de extras**, por empresa, trabajador, relación laboral y año. Cada mes seleccionado consulta su semestre completo: enero–junio para la extra de julio y julio–diciembre para diciembre. Julio también consulta el semestre anterior, para mostrar la extra correspondiente a ese mes. Seleccionar varios meses del mismo semestre no duplica su panel. La tarjeta de la columna I también permite consultar el desglose de su semestre.
+
+Se utilizan las condiciones vigentes de **cada mes**, aunque ese mes no figure entre los filtros de la tabla. Con seis meses completos y catorce pagas, el importe es la suma de los seis valores de sueldo base ordinario + antigüedad, dividida entre seis. Se admiten cambios de sueldo, jornada contractual o antigüedad entre meses cuando cada mes tiene condiciones únicas y un porcentaje de antigüedad estable. No se vuelve a multiplicar el sueldo por la jornada: ya representa el importe contratado. Los seguros solo intervienen mediante la antigüedad y el complemento fijo no se añade a la extra.
+
+El total se redondea una sola vez con la política seleccionada. El panel muestra además los devengos mensuales redondeados, su suma y la diferencia necesaria para conciliar con el total. Esa diferencia no se asigna automáticamente a un mes. En doce pagas durante todo el semestre no hay otra extra separada: el resultado es cero, sin duplicar importes.
+
+Si falta un mes completo de relación o condiciones, existe un cambio dentro del mes, faltan datos de sueldo/seguros, hay un aniversario sin regla de efectos o cambia la modalidad entre 12 y 14 pagas, se explica el motivo y no se muestra una suma parcial como extra completa. El formulario exige confirmar ausencia de incidencias en los **periodos y semestres consultados**. Si el semestre no ha terminado en la fecha de consulta, el resultado se identifica como **proyección según las condiciones registradas**.
+
+El motor independiente está en `payroll_engine/semester_extras.py` y su lectura del histórico en `backend/employees/payroll_semester.py`. La consulta no modifica la base de datos, no registra pagos ni calcula IRPF o cotizaciones de la extra. La columna I conserva su referencia mensual; conectar el devengo con cotizaciones y los totales completos es otro incremento. Sin migraciones ni dependencias nuevas.

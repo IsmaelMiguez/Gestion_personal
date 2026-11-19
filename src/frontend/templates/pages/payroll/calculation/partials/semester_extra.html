@@ -1,0 +1,28 @@
+{% load i18n %}{% language "es" %}
+<article class="card shadow-sm border-primary-subtle mb-3">
+  <div class="card-header bg-primary-subtle p-3">
+    <h3 class="h5 mb-1">Extra de {{ extra.payment_label }} {{ extra.year }} · semestre {{ extra.semester }}</h3>
+    <p class="small mb-0">{{ extra.company }} · {{ extra.employee }} · relación #{{ extra.relationship_id }}</p>
+  </div>
+  <div class="card-body">
+    {% if extra.projected %}<p class="badge text-bg-info text-wrap">Proyección: el semestre no ha terminado a {{ extra.as_of_date|date:"d/m/Y" }}</p>{% endif %}
+    {% if extra.result %}
+      <p class="h3 text-primary">{{ extra.result.amount|floatformat:"2g" }} €</p>
+      {% if extra.result.payments_per_year == 12 %}<p>Doce pagas durante todo el semestre: no hay una extra separada que añadir.</p>{% else %}<p>Suma de los seis importes mensuales de sueldo base + antigüedad, dividida entre 6. Se redondea el total una sola vez.</p>{% endif %}
+    {% else %}<p class="fw-semibold text-warning-emphasis">Devengo pendiente: no se presenta una suma parcial como extra completa.</p>
+      <ul>{% for issue in extra.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+    {% endif %}
+    <div class="table-responsive"><table class="table table-sm table-striped align-middle">
+      <caption class="visually-hidden">Detalle del devengo por mes</caption>
+      <thead><tr><th scope="col">Mes</th><th scope="col">Pagas</th><th scope="col">Base (€)</th><th scope="col">Antigüedad (€)</th><th scope="col">Devengo mensual (€)</th></tr></thead>
+      <tbody>{% for row in extra.rows %}<tr><th scope="row">{{ row.month|date:"m/Y" }}</th>
+        {% if row.issue %}<td colspan="4" class="text-warning-emphasis">{{ row.issue }}</td>{% else %}
+        <td>{{ row.payments }}</td><td>{{ row.base_salary|floatformat:"2g" }}</td><td>{{ row.seniority|floatformat:"2g" }}</td><td>{% if extra.result %}{{ row.accrued|floatformat:"2g" }}{% else %}Pendiente{% endif %}</td>{% endif %}
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    {% if extra.result %}<p class="small mb-1">Suma de devengos mensuales redondeados: {{ extra.result.rounded_months_total|floatformat:"2g" }} €. Conciliación con el total: {{ extra.result.rounding_difference|floatformat:"2g" }} €.</p>
+    <p class="small mb-1">Redondeo: {{ extra.result.rounding }}. La diferencia no se asigna automáticamente a ningún mes.</p>{% endif %}
+    <p class="small text-body-secondary mb-0">Solo sueldo base y antigüedad, usando las condiciones de cada mes. Consulta sin incidencias declaradas; no registra un pago ni calcula retenciones de la extra. Un cambio entre 12/14 pagas, un mes incompleto o una regla de antigüedad sin resolver deja el total pendiente.</p>
+  </div>
+</article>
+{% endlanguage %}

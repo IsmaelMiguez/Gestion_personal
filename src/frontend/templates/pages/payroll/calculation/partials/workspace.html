@@ -48,6 +48,11 @@
   </form>
   <div id="report-output">
     {% include "pages/payroll/calculation/partials/table.html" %}
+    {% if semester_extras %}<section class="mt-4" aria-labelledby="semester-extras-title">
+      <h2 id="semester-extras-title" class="h4">Devengo semestral de extras</h2>
+      <p class="text-body-secondary">Cada mes seleccionado consulta su semestre completo: enero–junio para la extra de julio y julio–diciembre para diciembre. Seleccionar julio también muestra la extra devengada en el primer semestre. Se incluye el histórico aunque solo hayas seleccionado uno de sus meses.</p>
+      {% for extra in semester_extras %}{% include "pages/payroll/calculation/partials/semester_extra.html" with extra=extra only %}{% endfor %}
+    </section>{% endif %}
     <div id="calculation-detail" class="mt-4" aria-live="polite" tabindex="-1">{% include "pages/payroll/calculation/partials/detail.html" %}</div>
   </div>
 </section>

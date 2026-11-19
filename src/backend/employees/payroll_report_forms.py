@@ -32,7 +32,7 @@ class PayrollReportForm(BootstrapFormMixin, forms.Form):
     )
     rounding = OrdinaryPayrollForm.base_fields["rounding"]
     base_only = forms.BooleanField(
-        label="Confirmo que los periodos seleccionados no tienen incidencias, bonus, "
+        label="Confirmo que los periodos y semestres consultados no tienen incidencias, bonus, "
         "pluriempleo, bonificaciones ni cotizaciones especiales.",
         help_text="Los conceptos adicionales registrados se comprobarán igualmente.",
     )
