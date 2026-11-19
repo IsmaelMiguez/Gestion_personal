@@ -1,6 +1,6 @@
 """Read-only monthly reports and explanations from the same calculated values."""
 
-from datetime import date, timedelta
+from datetime import date
 from decimal import Context, Decimal, localcontext
 from unicodedata import combining, normalize
 
@@ -10,7 +10,10 @@ from payroll_engine.base_salary import (
     base_salary_from_annual,
     base_salary_from_monthly,
 )
-from payroll_engine.ordinary_payroll import calculate_ordinary_payroll_2026
+from payroll_engine.ordinary_payroll import (
+    InvalidPayrollInput,
+    calculate_ordinary_payroll_with_seniority_2026,
+)
 
 from .payroll_columns import COLUMNS
 from .payroll_extras import extra_reference_cell
@@ -86,22 +89,6 @@ def _scope_reasons(relationship, condition, start, end, year):
         reasons.append(
             "El motor ordinario aún no integra seguros o complementos distintos de cero."
         )
-    last_day = end - timedelta(days=1)
-    years = (
-        last_day.year
-        - relationship.seniority_date.year
-        - (
-            (last_day.month, last_day.day)
-            < (
-                relationship.seniority_date.month,
-                relationship.seniority_date.day,
-            )
-        )
-    )
-    if years >= 2:
-        reasons.append(
-            "La antigüedad mensual se presenta por separado; falta integrarla en extras, cotizaciones y totales de nómina."
-        )
     return reasons
 
 
@@ -132,7 +119,7 @@ def _salary_cells(condition, rounding):
     return {"O": cell}, salary, ""
 
 
-def report_row(relationship, year, month, rounding):
+def report_row(relationship, year, month, rounding, extra_estimate):
     with localcontext(Context(prec=28, rounding=rounding)):
         start = date(year, month, 1)
         end = date(year + (month == 12), month % 12 + 1, 1)
@@ -197,16 +184,39 @@ def report_row(relationship, year, month, rounding):
                     reasons.append(
                         "El sueldo anualizado supera el límite de entrada del motor ordinario."
                     )
-            if not reasons:
-                result = calculate_ordinary_payroll_2026(
-                    salary.annual_amount,
-                    condition.payments_per_year,
-                    condition.contribution_group,
-                    Decimal(condition.withholding_rate_basis_points) / 100,
-                    condition.occupational_risk_rate,
-                    rounding,
+            estimated_extras = Decimal("0.00")
+            if condition.payments_per_year == 14:
+                estimated_extras = extra_estimate["amount"]
+                if estimated_extras is None:
+                    reasons.extend(
+                        "Estimación anual de extras: " + issue
+                        for issue in extra_estimate["issues"]
+                    )
+            elif len(extra_estimate["payment_modalities"]) > 1:
+                reasons.append(
+                    "Cambio entre 12 y 14 pagas en el ejercicio: transición de cotización pendiente."
                 )
-                values.update(result_cells(result, condition))
+            if not reasons:
+                try:
+                    result = calculate_ordinary_payroll_with_seniority_2026(
+                        salary.annual_amount,
+                        condition.payments_per_year,
+                        seniority_values["P"]["value"],
+                        estimated_extras,
+                        condition.contribution_group,
+                        Decimal(condition.withholding_rate_basis_points) / 100,
+                        condition.occupational_risk_rate,
+                        rounding,
+                    )
+                except InvalidPayrollInput as error:
+                    reasons.append(str(error))
+                else:
+                    values.update(result_cells(result, condition))
+                    if condition.payments_per_year == 14:
+                        for code in ("X", "Z", "AC"):
+                            values[code]["annual_extra_estimate"] = (
+                                extra_estimate
+                            )
             extra_cell, extra_error = extra_reference_cell(
                 condition, salary, seniority_values, rounding
             )
@@ -215,6 +225,26 @@ def report_row(relationship, year, month, rounding):
                 if extra_cell is not None
                 else _pending("I", extra_error)
             )
+            if (
+                salary is not None
+                and "P" in seniority_values
+                and extra_cell is not None
+                and all(
+                    getattr(condition, name) == 0
+                    for name in condition.money_fields[1:]
+                )
+            ):
+                gross = (
+                    salary.ordinary_payment_amount
+                    + seniority_values["P"]["value"]
+                )
+                values["J"] = value_cell(
+                    "J",
+                    gross + extra_cell["value"],
+                    "Bruto ordinario + referencia mensual de extras (I)",
+                    f"{gross} + {extra_cell['value']}",
+                    "Equivalente mensual de referencia. La cotización utiliza X, calculada con la estimación anual; puede diferir si cambian las condiciones.",
+                )
         pending_reason = (
             " ".join(reasons)
             or "Este concepto del Excel aún no está implementado o requiere reglas de incidencias, extras o INSS."

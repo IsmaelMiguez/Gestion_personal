@@ -16,9 +16,126 @@ from ..models import (
 )
 from ..payroll_columns import COLUMNS
 from ..payroll_report import report_row
+from ..payroll_semester import annual_extra_estimate
 
 
 class PayrollReportTests(TestCase):
+    def test_full_ordinary_payroll_with_seniority_and_annual_estimate_detail(
+        self,
+    ):
+        self.relationship.seniority_date = date(2011, 1, 1)
+        self.relationship.save()
+        response = self.client.post(self.url, self.values)
+        cells = {
+            cell["code"]: cell for cell in response.context["rows"][0]["cells"]
+        }
+        for code, value in (
+            ("P", "700.00"),
+            ("W", "2700.00"),
+            ("X", "450.00"),
+            ("AC", "3150.00"),
+            ("BV", "204.76"),
+            ("BY", "1012.73"),
+            ("BZ", "405.00"),
+            ("CA", "2090.24"),
+            ("CB", "3712.73"),
+        ):
+            with self.subTest(code=code):
+                self.assertTrue(cells[code]["available"])
+                self.assertEqual(cells[code]["value"], Decimal(value))
+        response = self.client.post(
+            self.url,
+            {**self.values, "cell": cells["X"]["key"]},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertContains(response, "5400.00 ÷ 12 = 450.00")
+        self.assertContains(response, "Extra de Julio 2026")
+        self.assertContains(response, "Extra de Diciembre 2026")
+        self.assertNotContains(response, "<!doctype html>")
+
+    def test_known_future_salary_change_distinguishes_reference_from_contribution(
+        self,
+    ):
+        self.relationship.seniority_date = date(2011, 1, 1)
+        self.relationship.save()
+        self.condition.valid_until = date(2026, 7, 1)
+        self.condition.save()
+        self.condition.pk = None
+        self.condition.valid_from = date(2026, 7, 1)
+        self.condition.valid_until = None
+        self.condition.salary_period = "MONTHLY"
+        self.condition.salary_amount_cents = 240000
+        self.condition.save()
+        response = self.client.post(
+            self.url, {**self.values, "months": ["1", "7"]}
+        )
+        first, second = [
+            {cell["code"]: cell for cell in row["cells"]}
+            for row in response.context["rows"]
+        ]
+        self.assertEqual(first["I"]["value"], Decimal(450))
+        self.assertEqual(first["X"]["value"], Decimal(495))
+        self.assertEqual(first["J"]["value"], Decimal(3150))
+        self.assertEqual(first["Z"]["value"], Decimal(3195))
+        self.assertEqual(first["CA"]["value"], Decimal("2087.32"))
+        self.assertEqual(second["W"]["value"], Decimal(3240))
+        self.assertEqual(second["I"]["value"], Decimal(540))
+        self.assertEqual(second["X"]["value"], Decimal(495))
+
+    def test_twelve_payments_with_seniority_do_not_need_separate_extras(self):
+        self.relationship.seniority_date = date(2011, 1, 1)
+        self.relationship.save()
+        self.condition.salary_amount_cents = 2400000
+        self.condition.payments_per_year = 12
+        self.condition.save()
+        response = self.client.post(self.url, self.values)
+        cells = {
+            cell["code"]: cell for cell in response.context["rows"][0]["cells"]
+        }
+        self.assertEqual(cells["I"]["value"], Decimal(0))
+        self.assertEqual(cells["X"]["value"], Decimal(0))
+        self.assertEqual(cells["CA"]["value"], Decimal("2119.50"))
+
+    def test_incomplete_future_estimate_blocks_totals_and_transition_blocks_both_modalities(
+        self,
+    ):
+        self.condition.valid_until = date(2026, 7, 1)
+        self.condition.save()
+        response = self.client.post(self.url, self.values)
+        cells = {
+            cell["code"]: cell for cell in response.context["rows"][0]["cells"]
+        }
+        self.assertTrue(cells["P"]["available"])
+        self.assertFalse(cells["CA"]["available"])
+        self.assertIn("Estimación anual", cells["CA"]["note"])
+        self.condition.pk = None
+        self.condition.valid_from = date(2026, 7, 1)
+        self.condition.valid_until = None
+        self.condition.payments_per_year = 12
+        self.condition.save()
+        response = self.client.post(
+            self.url, {**self.values, "months": ["1", "7"]}
+        )
+        for row in response.context["rows"]:
+            cell = next(cell for cell in row["cells"] if cell["code"] == "CA")
+            self.assertFalse(cell["available"])
+            self.assertIn("12 y 14", cell["note"])
+
+        EmploymentCondition.objects.filter(valid_from=date(2026, 1, 1)).update(
+            payments_per_year=12
+        )
+        self.condition.payments_per_year = 14
+        self.condition.family_insurance_exempt_cents = None
+        self.condition.save()
+        response = self.client.post(self.url, {**self.values, "months": ["1"]})
+        cell = next(
+            cell
+            for cell in response.context["rows"][0]["cells"]
+            if cell["code"] == "CA"
+        )
+        self.assertFalse(cell["available"])
+        self.assertIn("12 y 14", cell["note"])
+
     def test_extra_reference_uses_seniority_and_excludes_direct_insurance_and_supplement(
         self,
     ):
@@ -50,18 +167,30 @@ class PayrollReportTests(TestCase):
         self.relationship.save()
         cells = {
             cell["code"]: cell
-            for cell in report_row(self.relationship, 2026, 1, ROUND_HALF_UP)[
-                "cells"
-            ]
+            for cell in report_row(
+                self.relationship,
+                2026,
+                1,
+                ROUND_HALF_UP,
+                annual_extra_estimate(
+                    self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
+                ),
+            )["cells"]
         }
         self.assertFalse(cells["I"]["available"])
         self.condition.payments_per_year = 12
         self.condition.save()
         cells = {
             cell["code"]: cell
-            for cell in report_row(self.relationship, 2026, 1, ROUND_HALF_UP)[
-                "cells"
-            ]
+            for cell in report_row(
+                self.relationship,
+                2026,
+                1,
+                ROUND_HALF_UP,
+                annual_extra_estimate(
+                    self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
+                ),
+            )["cells"]
         }
         self.assertEqual(cells["I"]["value"], Decimal("0.00"))
         self.assertTrue(cells["I"]["available"])
@@ -102,9 +231,15 @@ class PayrollReportTests(TestCase):
         self.condition.save()
         cells = {
             cell["code"]: cell
-            for cell in report_row(self.relationship, 2026, 1, ROUND_HALF_UP)[
-                "cells"
-            ]
+            for cell in report_row(
+                self.relationship,
+                2026,
+                1,
+                ROUND_HALF_UP,
+                annual_extra_estimate(
+                    self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
+                ),
+            )["cells"]
         }
         self.assertTrue(cells["G"]["available"])
         self.assertFalse(cells["P"]["available"])
@@ -113,9 +248,15 @@ class PayrollReportTests(TestCase):
         self.relationship.save()
         cells = {
             cell["code"]: cell
-            for cell in report_row(self.relationship, 2026, 1, ROUND_HALF_UP)[
-                "cells"
-            ]
+            for cell in report_row(
+                self.relationship,
+                2026,
+                1,
+                ROUND_HALF_UP,
+                annual_extra_estimate(
+                    self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
+                ),
+            )["cells"]
         }
         for code in ("G", "P"):
             self.assertFalse(cells[code]["available"])
@@ -294,7 +435,18 @@ class PayrollReportTests(TestCase):
                 EmploymentCondition.objects.filter(
                     pk=self.condition.pk
                 ).update(**{name: value})
-                row = report_row(self.relationship, 2026, 1, ROUND_HALF_UP)
+                row = report_row(
+                    self.relationship,
+                    2026,
+                    1,
+                    ROUND_HALF_UP,
+                    annual_extra_estimate(
+                        self.relationship,
+                        2026,
+                        ROUND_HALF_UP,
+                        date(2026, 11, 19),
+                    ),
+                )
                 cells = {cell["code"]: cell for cell in row["cells"]}
                 self.assertFalse(cells["CA"]["available"])
                 self.assertTrue(cells["O"]["available"])
@@ -302,11 +454,27 @@ class PayrollReportTests(TestCase):
                 self.condition.save()
 
     def test_year_without_rules_and_mid_month_change_are_explicit(self):
-        row = report_row(self.relationship, 2027, 1, ROUND_HALF_UP)
+        row = report_row(
+            self.relationship,
+            2027,
+            1,
+            ROUND_HALF_UP,
+            annual_extra_estimate(
+                self.relationship, 2027, ROUND_HALF_UP, date(2026, 11, 19)
+            ),
+        )
         self.assertIn("ejercicio", " ".join(row["issues"]))
         self.condition.valid_until = date(2026, 1, 15)
         self.condition.save()
-        row = report_row(self.relationship, 2026, 1, ROUND_HALF_UP)
+        row = report_row(
+            self.relationship,
+            2026,
+            1,
+            ROUND_HALF_UP,
+            annual_extra_estimate(
+                self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
+            ),
+        )
         self.assertFalse(
             next(cell for cell in row["cells"] if cell["code"] == "CA")[
                 "available"
@@ -384,11 +552,28 @@ class PayrollReportTests(TestCase):
         self.condition.salary_amount_cents = 200001
         self.condition.valid_until = date(2026, 2, 1)
         self.condition.save()
-        row = report_row(self.relationship, 2026, 1, ROUND_HALF_UP)
+        row = report_row(
+            self.relationship,
+            2026,
+            1,
+            ROUND_HALF_UP,
+            annual_extra_estimate(
+                self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
+            ),
+        )
         cells = {cell["code"]: cell for cell in row["cells"]}
         self.assertEqual(cells["O"]["value"], Decimal("2000.01"))
-        self.assertTrue(cells["CA"]["available"])
-        row = report_row(self.relationship, 2026, 2, ROUND_HALF_UP)
+        self.assertFalse(cells["CA"]["available"])
+        self.assertIn("Estimación anual", cells["CA"]["note"])
+        row = report_row(
+            self.relationship,
+            2026,
+            2,
+            ROUND_HALF_UP,
+            annual_extra_estimate(
+                self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
+            ),
+        )
         self.assertFalse(
             next(cell for cell in row["cells"] if cell["code"] == "O")[
                 "available"
@@ -400,14 +585,30 @@ class PayrollReportTests(TestCase):
     ):
         self.relationship.seniority_date = date(2024, 1, 15)
         self.relationship.save()
-        row = report_row(self.relationship, 2026, 1, ROUND_HALF_UP)
+        row = report_row(
+            self.relationship,
+            2026,
+            1,
+            ROUND_HALF_UP,
+            annual_extra_estimate(
+                self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
+            ),
+        )
         self.assertIn("antigüedad", " ".join(row["issues"]))
         self.relationship.seniority_date = date(2026, 1, 1)
         self.relationship.save()
         self.condition.salary_period = "MONTHLY"
         self.condition.salary_amount_cents = 999999999999
         self.condition.save()
-        row = report_row(self.relationship, 2026, 1, ROUND_HALF_UP)
+        row = report_row(
+            self.relationship,
+            2026,
+            1,
+            ROUND_HALF_UP,
+            annual_extra_estimate(
+                self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
+            ),
+        )
         self.assertIn("límite", " ".join(row["issues"]))
 
     def test_more_than_240_requested_periods_are_rejected(self):

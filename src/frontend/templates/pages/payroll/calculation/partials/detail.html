@@ -10,6 +10,11 @@
       <dt>Regla y observaciones</dt><dd>{{ detail.note }}</dd>
       <dt>Política de redondeo seleccionada</dt><dd>{{ detail.rounding }} · importes a céntimos cuando corresponda</dd></dl>
       {% if detail.semester_extra %}{% include "pages/payroll/calculation/partials/semester_extra.html" with extra=detail.semester_extra only %}{% endif %}
+      {% if detail.annual_extra_estimate %}
+        <h3 class="h5">Origen de la estimación anual de extras</h3>
+        <p>Julio + diciembre = {{ detail.annual_extra_estimate.amount|floatformat:"2g" }} €. La prorrata de cotización es este total dividido entre doce; no el importe de un solo semestre dividido entre doce.</p>
+        {% for extra in detail.annual_extra_estimate.semesters %}{% include "pages/payroll/calculation/partials/semester_extra.html" with extra=extra only %}{% endfor %}
+      {% endif %}
       <p class="small text-body-secondary mb-0">Detalle recalculado con los filtros y datos actuales. Los campos monetarios se expresan en euros y los tipos en porcentaje.</p>
     </div>
   </article>

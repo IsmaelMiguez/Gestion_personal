@@ -130,3 +130,40 @@ def semester_extra(relationship, year, first_month, rounding, as_of_date):
         "projected": end > as_of_date,
         "as_of_date": as_of_date,
     }
+
+
+def annual_extra_estimate(relationship, year, rounding, as_of_date):
+    """Estimate both extras from recorded history, retaining missing-data reasons."""
+    semesters = [
+        semester_extra(relationship, year, first, rounding, as_of_date)
+        for first in (1, 7)
+    ]
+    issues = [issue for semester in semesters for issue in semester["issues"]]
+    year_start = date(year, 1, 1)
+    year_end = date(year + 1, 1, 1)
+    modalities = {
+        condition.payments_per_year
+        for condition in relationship.conditions.all()
+        if condition.valid_from < year_end
+        and (
+            condition.valid_until is None or condition.valid_until > year_start
+        )
+        and condition.payments_per_year is not None
+    }
+    if len(modalities) > 1:
+        issues.append(
+            "Cambio entre 12 y 14 pagas durante el ejercicio: falta definir la transición para la cotización."
+        )
+    amount = None
+    if not issues:
+        with localcontext(_calculation_context(rounding)):
+            amount = sum(
+                (semester["result"].amount for semester in semesters),
+                Decimal("0.00"),
+            )
+    return {
+        "amount": amount,
+        "semesters": semesters,
+        "issues": issues,
+        "payment_modalities": modalities,
+    }

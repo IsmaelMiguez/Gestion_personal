@@ -20,32 +20,20 @@ def value_cell(code, value, formula, operands, note):
 
 
 def result_cells(result, condition):
-    gross = result.salary.ordinary_payment_amount
+    gross = result.gross_amount
     cells = {}
     entries = (
         (
-            "I",
-            result.extra_payment_accrual,
-            "Importe de una extra × número de extras ÷ 12",
-            f"{result.salary.extra_payment_amount} × {result.salary.extra_payments_per_year} ÷ 12",
-        ),
-        (
-            "J",
-            result.uncapped_contribution_base,
-            "Bruto ordinario + prorrata de extras",
-            f"{gross} + {result.extra_payment_accrual}",
-        ),
-        (
             "W",
             gross,
-            "Suma de devengos ordinarios; en este supuesto solo sueldo base",
-            str(gross),
+            "Sueldo base ordinario + antigüedad mensual",
+            f"{result.salary.ordinary_payment_amount} + {result.seniority_amount}",
         ),
         (
             "X",
             result.extra_payment_accrual,
-            "Prorrata de extras para cotización",
-            str(result.extra_payment_accrual),
+            "Estimación anual de ambas extras ÷ 12 (artículo 1)",
+            f"{result.estimated_annual_extra_amount} ÷ 12 = {result.extra_payment_accrual}",
         ),
         (
             "Z",

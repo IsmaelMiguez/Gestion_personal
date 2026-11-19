@@ -14,7 +14,7 @@ from .models import EmploymentCondition, EmploymentRelationship
 from .payroll_columns import COLUMNS, column_group
 from .payroll_report import report_row
 from .payroll_report_forms import PayrollReportForm
-from .payroll_semester import semester_extra
+from .payroll_semester import annual_extra_estimate
 
 
 @never_cache
@@ -75,25 +75,23 @@ def payroll_report(request):
             relationships = []
         for relationship in relationships:
             for year in sorted(data["years"]):
+                estimate = annual_extra_estimate(
+                    relationship, year, data["rounding"], date.today()
+                )
                 first_months = {
                     1 if month <= 6 else 7 for month in data["months"]
                 }
                 if 7 in data["months"]:
                     first_months.add(1)
-                semesters = {
-                    first: semester_extra(
-                        relationship,
-                        year,
-                        first,
-                        data["rounding"],
-                        date.today(),
-                    )
-                    for first in sorted(first_months)
-                }
-                semester_extras.extend(semesters.values())
+                semesters = dict(
+                    zip((1, 7), estimate["semesters"], strict=True)
+                )
+                semester_extras.extend(
+                    semesters[first] for first in sorted(first_months)
+                )
                 for month in sorted(data["months"]):
                     row = report_row(
-                        relationship, year, month, data["rounding"]
+                        relationship, year, month, data["rounding"], estimate
                     )
                     row["cells"] = [
                         cell

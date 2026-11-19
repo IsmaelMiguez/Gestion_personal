@@ -1,8 +1,8 @@
-"""Base-only ordinary payment: full month, full time, indefinite contract.
+"""Ordinary payment: full month, full time, indefinite contract.
 
 Monthly contribution groups 1–7 only; no special systems, rebates or
-additional retirement contributions. Extra payments are accrued equally
-and contributed monthly, but their actual payment is outside this result.
+additional retirement contributions. Estimated annual extras contribute
+monthly, but their actual payment is outside this result.
 """
 
 from dataclasses import dataclass
@@ -11,6 +11,7 @@ from decimal import Decimal, localcontext
 from . import rules_2026 as rules
 from .base_salary import (
     CENT,
+    MAX_INPUT_AMOUNT,
     BaseSalaryBreakdown,
     _calculation_context,
     base_salary_from_annual,
@@ -36,6 +37,9 @@ class Contribution:
 @dataclass(frozen=True, slots=True)
 class OrdinaryPayroll:
     salary: BaseSalaryBreakdown
+    seniority_amount: Decimal
+    gross_amount: Decimal
+    estimated_annual_extra_amount: Decimal
     extra_payment_accrual: Decimal
     uncapped_contribution_base: Decimal
     common_contribution_base: Decimal
@@ -109,25 +113,38 @@ def _contributions(
     return tuple(lines)
 
 
-def calculate_ordinary_payroll_2026(
-    annual_base_salary: Decimal,
-    payments_per_year: int,
+def _ordinary_payroll(
+    salary: BaseSalaryBreakdown,
+    monthly_seniority: Decimal,
+    estimated_annual_extras: Decimal,
     contribution_group: int,
     withholding_rate: Decimal,
     occupational_risk_rate: Decimal,
     rounding: str,
 ) -> OrdinaryPayroll:
-    """Calculate an ordinary payment; all inputs and rounding are explicit.
-
-    IRPF is applied to paid gross salary (RIRPF article 80), not to salary
-    after Social Security deductions. Its rate must already be determined.
-    Cost means this ordinary cash gross plus employer contributions; it does
-    not include accrued extra payments, which are returned separately.
-    """
     with localcontext(_calculation_context(rounding)):
-        salary = base_salary_from_annual(
-            annual_base_salary, payments_per_year, rounding
-        )
+        for field, value in (
+            ("monthly_seniority", monthly_seniority),
+            ("estimated_annual_extras", estimated_annual_extras),
+        ):
+            if (
+                not isinstance(value, Decimal)
+                or not value.is_finite()
+                or not Decimal(0) <= value <= MAX_INPUT_AMOUNT
+                or value != value.quantize(CENT)
+            ):
+                raise InvalidPayrollInput(
+                    field,
+                    "Indica un Decimal finito no negativo, dentro del límite monetario y sin fracciones de céntimo.",
+                )
+        if (
+            salary.extra_payments_per_year == 0
+            and estimated_annual_extras != 0
+        ):
+            raise InvalidPayrollInput(
+                "estimated_annual_extras",
+                "En doce pagas no se añade una segunda prorrata de extras.",
+            )
         if (
             type(contribution_group) is not int
             or not 1 <= contribution_group <= 7
@@ -138,10 +155,8 @@ def calculate_ordinary_payroll_2026(
             )
         _validate_rate(withholding_rate, "withholding_rate")
         _validate_rate(occupational_risk_rate, "occupational_risk_rate")
-        accrual = (
-            salary.extra_payment_amount * salary.extra_payments_per_year / 12
-        ).quantize(CENT)
-        gross = salary.ordinary_payment_amount
+        accrual = (estimated_annual_extras / 12).quantize(CENT)
+        gross = salary.ordinary_payment_amount + monthly_seniority
         uncapped = gross + accrual
         common = min(
             rules.MAXIMUM_BASE,
@@ -161,16 +176,77 @@ def calculate_ordinary_payroll_2026(
         )
         withholding = (gross * withholding_rate / 100).quantize(CENT)
         return OrdinaryPayroll(
-            salary,
-            accrual,
-            uncapped,
-            common,
-            professional,
-            lines,
-            employee_total,
-            employer_total,
-            withholding_rate,
-            withholding,
-            gross - employee_total - withholding,
-            gross + employer_total,
+            salary=salary,
+            seniority_amount=monthly_seniority,
+            gross_amount=gross,
+            estimated_annual_extra_amount=estimated_annual_extras,
+            extra_payment_accrual=accrual,
+            uncapped_contribution_base=uncapped,
+            common_contribution_base=common,
+            professional_contribution_base=professional,
+            contributions=lines,
+            employee_contributions=employee_total,
+            employer_contributions=employer_total,
+            withholding_rate=withholding_rate,
+            withholding_amount=withholding,
+            net_amount=gross - employee_total - withholding,
+            employer_cash_cost=gross + employer_total,
         )
+
+
+def calculate_ordinary_payroll_2026(
+    annual_base_salary: Decimal,
+    payments_per_year: int,
+    contribution_group: int,
+    withholding_rate: Decimal,
+    occupational_risk_rate: Decimal,
+    rounding: str,
+) -> OrdinaryPayroll:
+    """Keep the base-only simulator with equal extras and constant conditions."""
+    with localcontext(_calculation_context(rounding)):
+        salary = base_salary_from_annual(
+            annual_base_salary, payments_per_year, rounding
+        )
+        annual_extras = (
+            salary.extra_payment_amount * salary.extra_payments_per_year
+        )
+        return _ordinary_payroll(
+            salary,
+            Decimal("0.00"),
+            annual_extras,
+            contribution_group,
+            withholding_rate,
+            occupational_risk_rate,
+            rounding,
+        )
+
+
+def calculate_ordinary_payroll_with_seniority_2026(
+    annual_base_salary: Decimal,
+    payments_per_year: int,
+    monthly_seniority: Decimal,
+    estimated_annual_extras: Decimal,
+    contribution_group: int,
+    withholding_rate: Decimal,
+    occupational_risk_rate: Decimal,
+    rounding: str,
+) -> OrdinaryPayroll:
+    """Add seniority and an explicit annual estimate of extra payments.
+
+    Annual extras / 12 is contributed, not paid in the ordinary month
+    (Orden PJC/297/2026, article 1). IRPF applies to cash gross under
+    RIRPF article 80, using the already determined rate. Actual extra
+    payments and contribution adjustments for prior months are separate.
+    """
+    salary = base_salary_from_annual(
+        annual_base_salary, payments_per_year, rounding
+    )
+    return _ordinary_payroll(
+        salary,
+        monthly_seniority,
+        estimated_annual_extras,
+        contribution_group,
+        withholding_rate,
+        occupational_risk_rate,
+        rounding,
+    )
