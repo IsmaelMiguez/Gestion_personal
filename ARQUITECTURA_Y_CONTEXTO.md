@@ -2061,3 +2061,14 @@ seniority.py calcula porcentaje estable mensual e importe sobre sueldo base ordi
 La tabla incorpora G y P y sus tarjetas de fórmula/operandos/origen mediante payroll_seniority.py. G puede conocerse aunque falte la base monetaria; P depende de sueldo y cuatro seguros explícitos. La interfaz muestra que se aplica el perfil acordado. El importe queda separado de los totales: la integración en extras, cotización e IRPF/neto será otro incremento, una vez definidas las reglas retributivas. No se presentan como completas las nóminas que requieren esa integración.
 
 Se añaden seis pruebas del motor para escalones/topes, base de cuatro seguros, aniversarios, fechas bisiestas, errores y redondeo/contexto; dos de integración para tabla, tarjetas, exclusión del complemento fijo y estados pendientes. Sin migraciones ni dependencias nuevas. Cambios sin commits y pendientes de revisión.
+
+
+## Anexo AD. Composición y referencia de extras
+
+El usuario confirma expresamente que las pagas extraordinarias incluyen solo sueldo base y antigüedad. Esta decisión resuelve su composición: no se añaden directamente seguros ni complemento fijo. La antigüedad mantiene la base previamente acordada, que incluye sueldo base y los cuatro seguros; no se cambia su cálculo al formar la extra.
+
+Se añade extra_payments.py, independiente de Django, con calculate_extra_payment_reference y resultado inmutable. Entradas explícitas Decimal de sueldo ordinario y antigüedad ya calculada, número de pagas 12/14 y redondeo. En 14 pagas devuelve referencia por extra = sueldo + antigüedad, anual de extras = referencia × 2 y mensual = anual ÷ 12 redondeado; conserva el residuo anual de redondeo. En 12 devuelve ausencia de extras separadas, sin duplicar conceptos ya distribuidos en ordinarias. Las cantidades inválidas se rechazan mediante InvalidExtraPaymentInput con campo identificado.
+
+La columna I de la tabla muestra la referencia y su tarjeta explica operandos, importe por extra, referencia anual, prorrata y diferencia de redondeo. No se cambia el reparto salarial contractual ni se presenta la referencia como un pago efectivamente devengado. Sigue pendiente implementar el histórico semestral de julio/diciembre con altas/bajas, incidencias y cambios, así como la incorporación de la antigüedad a los totales de cotización y neto. Los totales no completos siguen pendientes. No se crean modelos, migraciones ni dependencias.
+
+Verificación: cinco pruebas del motor para composición, doce pagas sin duplicidad, errores, redondeo/contexto y cero; dos de integración para referencia con seguros/complemento, detalle, meses pendientes y doce pagas. 97 pruebas de aplicación y 27 del motor correctas. Cambios sin commits, pendientes de revisión.

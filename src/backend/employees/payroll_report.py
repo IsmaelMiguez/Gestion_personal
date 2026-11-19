@@ -13,6 +13,7 @@ from payroll_engine.base_salary import (
 from payroll_engine.ordinary_payroll import calculate_ordinary_payroll_2026
 
 from .payroll_columns import COLUMNS
+from .payroll_extras import extra_reference_cell
 from .payroll_report_values import result_cells, value_cell
 from .payroll_seniority import seniority_cells
 
@@ -206,6 +207,14 @@ def report_row(relationship, year, month, rounding):
                     rounding,
                 )
                 values.update(result_cells(result, condition))
+            extra_cell, extra_error = extra_reference_cell(
+                condition, salary, seniority_values, rounding
+            )
+            values["I"] = (
+                extra_cell
+                if extra_cell is not None
+                else _pending("I", extra_error)
+            )
         pending_reason = (
             " ".join(reasons)
             or "Este concepto del Excel aún no está implementado o requiere reglas de incidencias, extras o INSS."

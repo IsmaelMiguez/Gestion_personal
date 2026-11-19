@@ -12,7 +12,7 @@ from .payroll_report_values import value_cell
 
 PROFILE_NOTE = (
     "Perfil inicial de bienios y topes acordado para este proyecto; no es una tabla universal de convenios. "
-    "El complemento fijo no forma parte de esta base. La integración en extras, cotizaciones y neto sigue pendiente."
+    "El complemento fijo no forma parte de esta base. La antigüedad entra en la referencia de extras; su integración en los pagos efectivos, cotizaciones y neto sigue pendiente."
 )
 
 

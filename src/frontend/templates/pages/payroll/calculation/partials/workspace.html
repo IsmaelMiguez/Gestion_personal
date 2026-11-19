@@ -6,6 +6,7 @@
   </header>
   <div class="alert alert-primary">El cálculo ordinario disponible corresponde a 2026, mes completo y jornada completa en Régimen General con contrato indefinido. Los conceptos sin reglas o datos suficientes se muestran pendientes. La consulta no guarda ni modifica nóminas.</div>
   <div class="alert alert-secondary">Antigüedad: las columnas G y P utilizan el perfil inicial de bienios y topes acordado, sobre sueldo base más los cuatro seguros. No es una regla general para cualquier convenio. Los cambios de tramo dentro del mes se muestran pendientes de definir su fecha de efectos.</div>
+  <div class="alert alert-secondary">Extras: solo sueldo base y antigüedad. La columna I muestra su prorrata mensual de referencia con condiciones constantes; no es el pago de julio o diciembre. En doce pagas no se añade otra prorrata.</div>
   <form id="report-filters" method="post" action="{% url 'employees:calculation' %}"
         hx-post="{% url 'employees:calculation' %}" hx-target="#calculation-workspace" hx-swap="outerHTML"
         hx-disabled-elt="find button[type='submit']">

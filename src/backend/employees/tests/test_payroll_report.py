@@ -19,6 +19,54 @@ from ..payroll_report import report_row
 
 
 class PayrollReportTests(TestCase):
+    def test_extra_reference_uses_seniority_and_excludes_direct_insurance_and_supplement(
+        self,
+    ):
+        self.relationship.seniority_date = date(2011, 1, 1)
+        self.relationship.save()
+        self.condition.employee_insurance_exempt_cents = 10000
+        self.condition.fixed_supplement_cents = 50000
+        self.condition.save()
+        response = self.client.post(self.url, self.values)
+        cells = {
+            cell["code"]: cell for cell in response.context["rows"][0]["cells"]
+        }
+        self.assertEqual(cells["P"]["value"], Decimal(735))
+        self.assertEqual(cells["I"]["value"], Decimal("455.83"))
+        self.assertFalse(cells["CA"]["available"])
+        response = self.client.post(
+            self.url,
+            {**self.values, "cell": cells["I"]["key"]},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertContains(response, "referencia por extra = 2735.00")
+        self.assertContains(response, "455,83")
+        self.assertContains(response, "no es el pago efectivo")
+
+    def test_extra_reference_stays_pending_with_unknown_seniority_but_twelve_does_not_add_extras(
+        self,
+    ):
+        self.relationship.seniority_date = date(2024, 1, 15)
+        self.relationship.save()
+        cells = {
+            cell["code"]: cell
+            for cell in report_row(self.relationship, 2026, 1, ROUND_HALF_UP)[
+                "cells"
+            ]
+        }
+        self.assertFalse(cells["I"]["available"])
+        self.condition.payments_per_year = 12
+        self.condition.save()
+        cells = {
+            cell["code"]: cell
+            for cell in report_row(self.relationship, 2026, 1, ROUND_HALF_UP)[
+                "cells"
+            ]
+        }
+        self.assertEqual(cells["I"]["value"], Decimal("0.00"))
+        self.assertTrue(cells["I"]["available"])
+        self.assertFalse(cells["P"]["available"])
+
     def test_seniority_cells_and_detail_include_insurances_but_not_fixed_supplement(
         self,
     ):

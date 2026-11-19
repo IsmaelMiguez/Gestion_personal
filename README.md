@@ -150,3 +150,14 @@ La pantalla **Calcular nóminas** muestra G (porcentaje) y P (importe mensual), 
 Solo se asigna un porcentaje mensual cuando es estable durante todo el mes. Un cambio de tramo dentro del mes queda pendiente de acordar su fecha de efectos; los aniversarios que no alteran el porcentaje congelado no bloquean el cálculo. Los aniversarios del 29 de febrero requieren una regla en años no bisiestos cuando pueda cambiar el tramo. Fechas futuras respecto al inicio del mes y cantidades inválidas se rechazan explícitamente.
 
 Este incremento muestra la antigüedad por separado. No se introduce todavía en extras, bases, cuotas o líquido: los totales con antigüedad permanecen pendientes hasta definir su integración. No requiere migraciones ni nuevas dependencias.
+
+
+## Composición de las pagas extraordinarias
+
+Confirmado por el usuario: **solo sueldo base y antigüedad**. Los cuatro seguros no se suman directamente a la extra, pero sí participan en el importe de antigüedad según la regla anterior. El complemento fijo queda excluido.
+
+`payroll_engine/extra_payments.py` calcula una referencia para condiciones constantes. Con 14 pagas, la referencia por extra es sueldo base ordinario + antigüedad mensual; la referencia anual de extras es el doble y la prorrata mensual es ese total dividido por 12, con redondeo explícito. La diferencia anual de redondeo se conserva sin asignarla a un pago. Con 12 pagas no hay extras separadas ni se añade otra prorrata, porque los conceptos ya se distribuyen en las ordinarias.
+
+En **Calcular nóminas**, la columna I y su tarjeta muestran esa prorrata y los operandos, incluso cuando otras partidas de la nómina siguen pendientes. Si no se conoce la antigüedad, la referencia de 14 pagas queda pendiente. En 12 pagas la ausencia de prorrata adicional se conoce independientemente de las partidas monetarias pendientes.
+
+Este incremento no calcula el pago efectivo de julio/diciembre ni certifica el devengo histórico de un semestre: aún deben resolverse altas/bajas, incidencias y cambios de condiciones o de tramo. Tampoco incorpora la antigüedad a los totales de SS/IRPF/neto todavía; los totales incompletos permanecen pendientes. No requiere migraciones ni dependencias nuevas.
