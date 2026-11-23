@@ -9,6 +9,7 @@
       {% if detail.operands %}<dt>Valores utilizados</dt><dd class="font-monospace text-break">{{ detail.operands }}</dd>{% endif %}
       <dt>Regla y observaciones</dt><dd>{{ detail.note }}</dd>
       <dt>Política de redondeo seleccionada</dt><dd>{{ detail.rounding }} · importes a céntimos cuando corresponda</dd></dl>
+      {% if detail.payment_breakdown %}{% include "pages/payroll/calculation/partials/payment_breakdown.html" with payment=detail.payment_breakdown only %}{% endif %}
       {% if detail.semester_extra %}{% include "pages/payroll/calculation/partials/semester_extra.html" with extra=detail.semester_extra only %}{% endif %}
       {% if detail.annual_extra_estimate %}
         <h3 class="h5">Origen de la estimación anual de extras</h3>

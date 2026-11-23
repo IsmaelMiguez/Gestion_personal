@@ -26,7 +26,7 @@ class EmploymentConditionForm(forms.ModelForm):
     salary_amount = euro_field("Sueldo base (€)")
     salary_amount.help_text = (
         "Importe correspondiente a la jornada habitual del contrato, "
-        "sin antigüedad, seguros ni complementos. "
+        "sin antigüedad ni complementos y antes de sustituir dinero por seguros flexibles. "
         "No lo conviertas a jornada completa si el contrato es a tiempo parcial."
     )
     employee_insurance_exempt = euro_field("Seguro trabajador exento (€/mes)")
@@ -45,6 +45,10 @@ class EmploymentConditionForm(forms.ModelForm):
 
     class Meta:
         model = EmploymentCondition
+        help_texts = {
+            "contract_type": "Por ejemplo, Indefinido o Temporal. El cálculo ordinario actual admite Indefinido; General es un régimen, no una modalidad contractual.",
+            "social_security_regime": "Para el cálculo ordinario actual indica Régimen General. Otros regímenes pueden registrarse, pero su cálculo queda pendiente.",
+        }
         exclude = (
             *EmploymentCondition.money_fields,
             "withholding_rate_basis_points",
@@ -52,6 +56,12 @@ class EmploymentConditionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        for storage_name in EmploymentCondition.money_fields[1:5]:
+            self.fields[storage_name.removesuffix("_cents")].help_text = (
+                "Prima mensual que sustituye salario en dinero (retribución flexible). "
+                "El ingreso a cuenta de la parte sujeta se descuenta al trabajador. "
+                "La clasificación exenta/sujeta debe estar comprobada; no se validan límites anuales."
+            )
         for storage_name in EmploymentCondition.money_fields:
             name = storage_name.removesuffix("_cents")
             value = getattr(self.instance, storage_name)

@@ -6,7 +6,14 @@
       <caption class="visually-hidden">Cálculos por empresa, trabajador, contrato y periodo. Cada celda abre su explicación.</caption>
       <thead class="table-primary"><tr><th scope="col">Empresa</th><th scope="col">Trabajador</th><th scope="col">Relación</th><th scope="col">Periodo</th>{% for code, label in columns %}<th scope="col">{{ code }} · {{ label }}</th>{% endfor %}</tr></thead>
       <tbody>{% for row in rows %}<tr>
-        <th scope="row">{{ row.company }}</th><td>{{ row.employee }}</td><td>#{{ row.relationship_id }}</td><td class="text-nowrap">{{ row.period }}</td>
+        <th scope="row">{{ row.company }}</th><td>{{ row.employee }}</td><td>#{{ row.relationship_id }}</td>
+        <td><span class="text-nowrap">{{ row.period }}</span>
+          {% if row.issues %}<details class="mt-2 text-start">
+            <summary class="text-warning-emphasis fw-semibold">Nómina pendiente: revisar datos</summary>
+            <ul class="small mt-2">{% for issue in row.issues %}<li>{{ issue }}</li>{% endfor %}</ul>
+            <a class="small" href="{% url 'employees:detail' row.employee.pk %}">Ver condiciones del trabajador</a>
+          </details>{% endif %}
+        </td>
         {% for cell in row.cells %}<td class="text-end text-nowrap">
           <button type="submit" form="report-filters" name="cell" value="{{ cell.key }}"
                   class="btn btn-sm {% if cell.available %}btn-link{% else %}btn-outline-warning text-dark{% endif %}"

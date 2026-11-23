@@ -55,9 +55,9 @@ def result_cells(result, condition):
         ),
         (
             "AE",
-            gross,
-            "Retribución dineraria sujeta satisfecha en la mensualidad",
-            str(gross),
+            result.taxable_gross_amount,
+            "Bruto dinerario + seguro en especie sujeto (sin ingreso a cuenta añadido, porque se repercute)",
+            f"{result.cash_gross_amount} + {result.insurance_taxable_amount} = {result.taxable_gross_amount}",
         ),
         (
             "BV",
@@ -84,14 +84,15 @@ def result_cells(result, condition):
         (
             "BZ",
             result.withholding_amount,
-            "Bruto sujeto × IRPF informado ÷ 100",
-            f"{gross} × {result.withholding_rate} ÷ 100",
+            "Retención dineraria + ingreso a cuenta repercutido al trabajador",
+            f"({result.cash_gross_amount} × {result.withholding_rate} ÷ 100) = {result.cash_withholding_amount}; "
+            f"({result.insurance_taxable_amount} × {result.withholding_rate} ÷ 100) = {result.payment_on_account_amount}; total = {result.withholding_amount}",
         ),
         (
             "CA",
             result.net_amount,
-            "Bruto − SS trabajador − IRPF",
-            f"{gross} − {result.employee_contributions} − {result.withholding_amount}",
+            "Bruto dinerario − SS trabajador − retención dineraria − ingreso a cuenta repercutido",
+            f"({gross} − seguros {result.insurance_amount}) − {result.employee_contributions} − {result.cash_withholding_amount} − {result.payment_on_account_amount} = {result.net_amount}",
         ),
         (
             "CB",
@@ -114,6 +115,12 @@ def result_cells(result, condition):
     )
     for code, value, formula, operands in entries:
         cells[code] = value_cell(code, value, formula, operands, SOURCE)
+    for code in ("AE", "BZ", "CA"):
+        cells[code]["note"] = (
+            "Retribución flexible confirmada: seguro en sustitución de salario dinerario, sin añadirlo de nuevo al bruto. "
+            "Ingreso a cuenta repercutido íntegramente al trabajador. LIRPF artículos 42–43 y RIRPF artículos 80 y 102. "
+            "La clasificación exenta/sujeta es informada: no se verifican automáticamente requisitos ni límites anuales."
+        )
     for index, employee_code, employer_code in (
         (0, "AF", "AG"),
         (1, "AM", "AN"),

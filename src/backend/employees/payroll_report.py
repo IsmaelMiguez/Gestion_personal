@@ -12,7 +12,7 @@ from payroll_engine.base_salary import (
 )
 from payroll_engine.ordinary_payroll import (
     InvalidPayrollInput,
-    calculate_ordinary_payroll_with_seniority_2026,
+    calculate_flexible_payroll_2026,
 )
 
 from .payroll_columns import COLUMNS
@@ -70,7 +70,8 @@ def _scope_reasons(relationship, condition, start, end, year):
         "indefinido ordinario",
     ):
         reasons.append(
-            "El contrato registrado no identifica el supuesto indefinido ordinario."
+            f"Modalidad contractual «{condition.contract_type}»: el caso soportado requiere «Indefinido» o «Indefinido ordinario». "
+            "«General» identifica un régimen, no una modalidad contractual."
         )
     if condition.contribution_group not in range(1, 8):
         reasons.append(
@@ -80,14 +81,20 @@ def _scope_reasons(relationship, condition, start, end, year):
         reasons.append("Falta el tipo AT/EP.")
     if condition.withholding_rate_basis_points is None:
         reasons.append("Falta el IRPF informado.")
-    extras = [getattr(condition, name) for name in condition.money_fields[1:]]
-    if any(value is None for value in extras):
-        reasons.append(
-            "Hay seguros o complementos sin informar: registra 0 si no existen."
+    missing = [
+        str(condition._meta.get_field(name).verbose_name).removesuffix(
+            " (céntimos)"
         )
-    if any(value is not None and value != 0 for value in extras):
+        for name in condition.money_fields[1:]
+        if getattr(condition, name) is None
+    ]
+    if missing:
         reasons.append(
-            "El motor ordinario aún no integra seguros o complementos distintos de cero."
+            f"Campos sin informar: {', '.join(missing)}. Registra 0 solo si no existen; vacío no significa cero."
+        )
+    if condition.fixed_supplement_cents not in (None, 0):
+        reasons.append(
+            "Complemento fijo distinto de cero: falta confirmar su modalidad de pago y periodicidad."
         )
     return reasons
 
@@ -177,7 +184,7 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                         Decimal(amount) / 100,
                         "Importe contractual registrado en céntimos ÷ 100",
                         str(amount),
-                        "Dato informado; su tratamiento retributivo y fiscal aún no se integra en el motor.",
+                        "Importe mensual informado. Los seguros sustituyen salario dinerario como retribución flexible; la parte exenta/sujeta la informa el usuario y no se valida automáticamente su límite anual.",
                     )
             if not reasons:
                 if salary.annual_amount > MAX_INPUT_AMOUNT:
@@ -198,11 +205,21 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                 )
             if not reasons:
                 try:
-                    result = calculate_ordinary_payroll_with_seniority_2026(
+                    result = calculate_flexible_payroll_2026(
                         salary.annual_amount,
                         condition.payments_per_year,
                         seniority_values["P"]["value"],
                         estimated_extras,
+                        Decimal(
+                            condition.employee_insurance_exempt_cents
+                            + condition.family_insurance_exempt_cents
+                        )
+                        / 100,
+                        Decimal(
+                            condition.employee_insurance_taxable_cents
+                            + condition.family_insurance_taxable_cents
+                        )
+                        / 100,
                         condition.contribution_group,
                         Decimal(condition.withholding_rate_basis_points) / 100,
                         condition.occupational_risk_rate,
@@ -212,6 +229,8 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                     reasons.append(str(error))
                 else:
                     values.update(result_cells(result, condition))
+                    for code in ("W", "AE", "BZ", "CA", "CB", "CG"):
+                        values[code]["payment_breakdown"] = result
                     if condition.payments_per_year == 14:
                         for code in ("X", "Z", "AC"):
                             values[code]["annual_extra_estimate"] = (
@@ -229,10 +248,7 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                 salary is not None
                 and "P" in seniority_values
                 and extra_cell is not None
-                and all(
-                    getattr(condition, name) == 0
-                    for name in condition.money_fields[1:]
-                )
+                and condition.fixed_supplement_cents == 0
             ):
                 gross = (
                     salary.ordinary_payment_amount

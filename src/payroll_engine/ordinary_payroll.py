@@ -39,6 +39,13 @@ class OrdinaryPayroll:
     salary: BaseSalaryBreakdown
     seniority_amount: Decimal
     gross_amount: Decimal
+    insurance_exempt_amount: Decimal
+    insurance_taxable_amount: Decimal
+    insurance_amount: Decimal
+    cash_gross_amount: Decimal
+    taxable_gross_amount: Decimal
+    cash_withholding_amount: Decimal
+    payment_on_account_amount: Decimal
     estimated_annual_extra_amount: Decimal
     extra_payment_accrual: Decimal
     uncapped_contribution_base: Decimal
@@ -117,6 +124,8 @@ def _ordinary_payroll(
     salary: BaseSalaryBreakdown,
     monthly_seniority: Decimal,
     estimated_annual_extras: Decimal,
+    insurance_exempt: Decimal,
+    insurance_taxable: Decimal,
     contribution_group: int,
     withholding_rate: Decimal,
     occupational_risk_rate: Decimal,
@@ -126,6 +135,8 @@ def _ordinary_payroll(
         for field, value in (
             ("monthly_seniority", monthly_seniority),
             ("estimated_annual_extras", estimated_annual_extras),
+            ("insurance_exempt", insurance_exempt),
+            ("insurance_taxable", insurance_taxable),
         ):
             if (
                 not isinstance(value, Decimal)
@@ -157,6 +168,14 @@ def _ordinary_payroll(
         _validate_rate(occupational_risk_rate, "occupational_risk_rate")
         accrual = (estimated_annual_extras / 12).quantize(CENT)
         gross = salary.ordinary_payment_amount + monthly_seniority
+        insurance = insurance_exempt + insurance_taxable
+        if insurance > gross:
+            raise InvalidPayrollInput(
+                "insurance_amount",
+                "Los seguros flexibles no pueden superar el bruto que sustituyen.",
+            )
+        cash_gross = gross - insurance
+        taxable_gross = cash_gross + insurance_taxable
         uncapped = gross + accrual
         common = min(
             rules.MAXIMUM_BASE,
@@ -174,11 +193,22 @@ def _ordinary_payroll(
         employer_total = sum(
             (line.employer_amount for line in lines), Decimal("0.00")
         )
-        withholding = (gross * withholding_rate / 100).quantize(CENT)
+        cash_withholding = (cash_gross * withholding_rate / 100).quantize(CENT)
+        payment_on_account = (
+            insurance_taxable * withholding_rate / 100
+        ).quantize(CENT)
+        withholding = cash_withholding + payment_on_account
         return OrdinaryPayroll(
             salary=salary,
             seniority_amount=monthly_seniority,
             gross_amount=gross,
+            insurance_exempt_amount=insurance_exempt,
+            insurance_taxable_amount=insurance_taxable,
+            insurance_amount=insurance,
+            cash_gross_amount=cash_gross,
+            taxable_gross_amount=taxable_gross,
+            cash_withholding_amount=cash_withholding,
+            payment_on_account_amount=payment_on_account,
             estimated_annual_extra_amount=estimated_annual_extras,
             extra_payment_accrual=accrual,
             uncapped_contribution_base=uncapped,
@@ -189,7 +219,7 @@ def _ordinary_payroll(
             employer_contributions=employer_total,
             withholding_rate=withholding_rate,
             withholding_amount=withholding,
-            net_amount=gross - employee_total - withholding,
+            net_amount=cash_gross - employee_total - withholding,
             employer_cash_cost=gross + employer_total,
         )
 
@@ -214,6 +244,8 @@ def calculate_ordinary_payroll_2026(
             salary,
             Decimal("0.00"),
             annual_extras,
+            Decimal("0.00"),
+            Decimal("0.00"),
             contribution_group,
             withholding_rate,
             occupational_risk_rate,
@@ -245,6 +277,43 @@ def calculate_ordinary_payroll_with_seniority_2026(
         salary,
         monthly_seniority,
         estimated_annual_extras,
+        Decimal("0.00"),
+        Decimal("0.00"),
+        contribution_group,
+        withholding_rate,
+        occupational_risk_rate,
+        rounding,
+    )
+
+
+def calculate_flexible_payroll_2026(
+    annual_base_salary: Decimal,
+    payments_per_year: int,
+    monthly_seniority: Decimal,
+    estimated_annual_extras: Decimal,
+    insurance_exempt: Decimal,
+    insurance_taxable: Decimal,
+    contribution_group: int,
+    withholding_rate: Decimal,
+    occupational_risk_rate: Decimal,
+    rounding: str,
+) -> OrdinaryPayroll:
+    """Replace cash salary with insurance; recharge taxable in-kind tax.
+
+    The contractual salary is before flexible compensation. User-classified
+    exempt/taxable premiums are monthly. Exempt insurance does not escape
+    Social Security; recharged tax on taxable insurance is not grossed up.
+    This does not validate exemption eligibility or annual per-person caps.
+    """
+    salary = base_salary_from_annual(
+        annual_base_salary, payments_per_year, rounding
+    )
+    return _ordinary_payroll(
+        salary,
+        monthly_seniority,
+        estimated_annual_extras,
+        insurance_exempt,
+        insurance_taxable,
         contribution_group,
         withholding_rate,
         occupational_risk_rate,

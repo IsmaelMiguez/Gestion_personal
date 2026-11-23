@@ -20,6 +20,83 @@ from ..payroll_semester import annual_extra_estimate
 
 
 class PayrollReportTests(TestCase):
+    def test_flexible_insurances_produce_cash_net_and_recharged_tax_detail(
+        self,
+    ):
+        self.relationship.seniority_date = date(2024, 1, 1)
+        self.relationship.save()
+        self.condition.employee_insurance_exempt_cents = 4000
+        self.condition.employee_insurance_taxable_cents = 2000
+        self.condition.family_insurance_exempt_cents = 1000
+        self.condition.family_insurance_taxable_cents = 3000
+        self.condition.save()
+        response = self.client.post(self.url, self.values)
+        cells = {
+            cell["code"]: cell for cell in response.context["rows"][0]["cells"]
+        }
+        for code, value in (
+            ("P", "105.00"),
+            ("W", "2105.00"),
+            ("X", "350.83"),
+            ("AC", "2455.83"),
+            ("AE", "2055.00"),
+            ("BV", "159.63"),
+            ("BZ", "308.25"),
+            ("CA", "1537.12"),
+            ("CB", "2894.55"),
+        ):
+            with self.subTest(code=code):
+                self.assertTrue(cells[code]["available"])
+                self.assertEqual(cells[code]["value"], Decimal(value))
+        response = self.client.post(
+            self.url,
+            {**self.values, "cell": cells["BZ"]["key"]},
+            HTTP_HX_REQUEST="true",
+        )
+        payment = response.context["detail"]["payment_breakdown"]
+        self.assertEqual(payment.cash_gross_amount, Decimal(2005))
+        self.assertEqual(payment.cash_withholding_amount, Decimal("300.75"))
+        self.assertEqual(payment.payment_on_account_amount, Decimal("7.50"))
+        self.assertContains(response, "Ingreso a cuenta repercutido")
+        self.assertContains(response, "Del bruto al ingreso bancario")
+        self.assertNotContains(response, "<!doctype html>")
+        self.condition.refresh_from_db()
+        self.assertEqual(self.condition.salary_amount_cents, 2800000)
+        self.assertEqual(self.condition.family_insurance_taxable_cents, 3000)
+
+    def test_flexible_insurance_exceeding_cash_budget_leaves_specific_pending_reason(
+        self,
+    ):
+        self.condition.employee_insurance_exempt_cents = 300000
+        self.condition.save()
+        response = self.client.post(self.url, self.values)
+        cell = next(
+            cell
+            for cell in response.context["rows"][0]["cells"]
+            if cell["code"] == "CA"
+        )
+        self.assertFalse(cell["available"])
+        self.assertIn("superar el bruto", cell["note"])
+
+    def test_table_explains_actual_missing_fields_and_unsupported_contract(
+        self,
+    ):
+        self.condition.contract_type = "General"
+        for name in self.condition.money_fields[1:]:
+            setattr(self.condition, name, None)
+        self.condition.save()
+        response = self.client.post(self.url, self.values)
+        self.assertContains(response, "Nómina pendiente: revisar datos")
+        self.assertContains(response, "Modalidad contractual «General»")
+        self.assertContains(response, "seguro trabajador exento")
+        self.assertContains(response, "seguro familia sujeto")
+        self.assertContains(response, "complemento fijo")
+        self.assertContains(response, "vacío no significa cero")
+        self.condition.refresh_from_db()
+        self.assertIsNone(self.condition.employee_insurance_exempt_cents)
+        self.assertIsNone(self.condition.fixed_supplement_cents)
+        self.assertEqual(self.condition.contract_type, "General")
+
     def test_full_ordinary_payroll_with_seniority_and_annual_estimate_detail(
         self,
     ):

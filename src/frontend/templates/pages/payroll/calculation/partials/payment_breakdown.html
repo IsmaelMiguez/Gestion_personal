@@ -1,0 +1,15 @@
+<section class="border rounded-3 bg-body-tertiary p-3 mb-3" aria-label="Desglose dinerario y en especie">
+  <h3 class="h5">Del bruto al ingreso bancario</h3>
+  <dl class="row mb-0">
+    <dt class="col-sm-8">Bruto ordinario antes de retribución flexible</dt><dd class="col-sm-4 text-sm-end">{{ payment.gross_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Seguro exento informado</dt><dd class="col-sm-4 text-sm-end">{{ payment.insurance_exempt_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Seguro sujeto informado</dt><dd class="col-sm-4 text-sm-end">{{ payment.insurance_taxable_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Bruto dinerario (bruto − ambos seguros)</dt><dd class="col-sm-4 text-sm-end">{{ payment.cash_gross_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Valoración sujeta a IRPF (dinero + especie sujeta)</dt><dd class="col-sm-4 text-sm-end">{{ payment.taxable_gross_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Retención dineraria</dt><dd class="col-sm-4 text-sm-end">{{ payment.cash_withholding_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Ingreso a cuenta repercutido</dt><dd class="col-sm-4 text-sm-end">{{ payment.payment_on_account_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Seguridad Social del trabajador</dt><dd class="col-sm-4 text-sm-end">{{ payment.employee_contributions|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8 text-success-emphasis">Líquido en dinero</dt><dd class="col-sm-4 text-sm-end fw-bold text-success-emphasis">{{ payment.net_amount|floatformat:"2g" }} €</dd>
+  </dl>
+  <p class="small text-body-secondary mb-0">El seguro se paga a la aseguradora, no al trabajador. Cotiza dentro del bruto total, incluida su parte exenta de IRPF. El ingreso a cuenta se descuenta al trabajador y no se suma al coste de empresa. Cada importe fiscal se redondea por separado.</p>
+</section>

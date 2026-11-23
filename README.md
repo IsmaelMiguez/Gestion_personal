@@ -136,7 +136,7 @@ Cada fila identifica empresa, trabajador, relación laboral y mes. Se consultan 
 
 Los conceptos no implementados permanecen **Pendientes**, con el motivo en su detalle. No se copian los importes sintéticos del libro. La primera versión calcula el caso ordinario de 2026: mes completo, jornada completa, Régimen General, contrato indefinido ordinario y grupos mensuales 1–7. El formulario exige declarar ausencia de incidencias, bonus, pluriempleo, bonificaciones y cotizaciones especiales. No se deduce esa ausencia de los datos del contrato.
 
-Para los totales hacen falta sueldo/pagas, IRPF, grupo y AT/EP. Seguros y complemento fijo deben estar informados explícitamente con 0 para el caso base. Si faltan, son distintos de cero, hay cambios de antigüedad sin regla de efectos dentro del mes, cambios de condiciones dentro del mes o un ejercicio/régimen no soportado, los totales quedan pendientes; los datos de contrato que sí se conocen se muestran con su origen. El pago efectivo de extras, seguros/complemento fijo, ajustes, NCM, INSS y controles del Excel necesitan sus siguientes incrementos de cálculo. El selector completo no implica que el motor ya implemente todas esas reglas.
+Para los totales hacen falta sueldo/pagas, IRPF, grupo y AT/EP. Los seguros deben estar informados explícitamente, con 0 si no existen; el caso soportado usa retribución flexible con ingreso a cuenta repercutido. El complemento fijo distinto de cero sigue pendiente de confirmar su pago. Si faltan importes, hay cambios de antigüedad sin regla de efectos dentro del mes, cambios de condiciones dentro del mes o un ejercicio/régimen no soportado, los totales quedan pendientes; los datos de contrato que sí se conocen se muestran con su origen. El pago efectivo de extras, seguros/complemento fijo, ajustes, NCM, INSS y controles del Excel necesitan sus siguientes incrementos de cálculo. El selector completo no implica que el motor ya implemente todas esas reglas.
 
 Pruebas de esta vista: `uv run python src/manage.py test backend.employees.tests.test_payroll_report`.
 
@@ -149,7 +149,7 @@ La pantalla **Calcular nóminas** muestra G (porcentaje) y P (importe mensual), 
 
 Solo se asigna un porcentaje mensual cuando es estable durante todo el mes. Un cambio de tramo dentro del mes queda pendiente de acordar su fecha de efectos; los aniversarios que no alteran el porcentaje congelado no bloquean el cálculo. Los aniversarios del 29 de febrero requieren una regla en años no bisiestos cuando pueda cambiar el tramo. Fechas futuras respecto al inicio del mes y cantidades inválidas se rechazan explícitamente.
 
-La antigüedad alimenta la referencia de extras, el devengo semestral y la nómina ordinaria soportada: sueldo base más antigüedad, con seguros y complemento fijo explícitamente a cero. No requiere migraciones ni nuevas dependencias.
+La antigüedad alimenta la referencia de extras, el devengo semestral y la nómina ordinaria soportada: sueldo base más antigüedad, con seguros flexibles informados y complemento fijo a cero mientras no se confirme su tratamiento. No requiere migraciones ni nuevas dependencias.
 
 
 ## Composición de las pagas extraordinarias
@@ -178,7 +178,7 @@ El motor independiente está en `payroll_engine/semester_extras.py` y su lectura
 
 ## Nómina ordinaria con antigüedad y extras estimadas
 
-La vista **Calcular nóminas** integra ahora sueldo base + antigüedad en bruto, cuotas, IRPF informado, líquido y coste empresarial. Se mantiene el alcance de mes completo, jornada completa, grupos mensuales 1–7 y contrato indefinido ordinario del Régimen General en 2026. Los cuatro seguros y el complemento fijo deben estar informados a cero: su tratamiento fiscal y en especie sigue fuera de este incremento. Un aniversario sin regla de efectos o cualquier dato obligatorio ausente impide publicar un total incompleto.
+La vista **Calcular nóminas** integra ahora sueldo base + antigüedad en bruto, cuotas, IRPF informado, líquido y coste empresarial. Se mantiene el alcance de mes completo, jornada completa, grupos mensuales 1–7 y contrato indefinido ordinario del Régimen General en 2026. Los cuatro seguros se admiten como retribución flexible en el perfil confirmado que se detalla a continuación. El complemento fijo distinto de cero permanece pendiente de concretar su pago. Un aniversario sin regla de efectos o cualquier dato obligatorio ausente impide publicar un total incompleto.
 
 La [Orden PJC/297/2026, artículo 1](https://www.boe.es/buscar/act.php?id=BOE-A-2026-7296#a1) establece la parte proporcional de extras sobre el importe anual estimado; para retribución mensual se divide entre 12. Para 14 pagas, la aplicación suma las dos extras semestrales calculadas con las condiciones registradas de cada mes. Esto utiliza el ejercicio completo aunque los filtros solo muestren enero. Las condiciones futuras abiertas se proyectan según su vigencia registrada; no se reconstruye qué información se conocía originalmente en una nómina pasada ni se hacen regularizaciones automáticas. Si falta un semestre calculable, el total ordinario queda pendiente con su motivo.
 
@@ -194,3 +194,19 @@ I y X pueden diferir si cambian sueldo o antigüedad entre meses. Al pulsar X, Z
 El IRPF se aplica al bruto ordinario satisfecho con el tipo ya informado, conforme al [artículo 80 del Reglamento del IRPF](https://www.boe.es/buscar/act.php?id=BOE-A-2007-6820#a80); no se resta antes la cuota de SS ni se calcula el tipo. En julio/diciembre el líquido de esta tabla sigue siendo el de la paga ordinaria, sin añadir el pago separado de la extra. No se cambia el reparto contractual ni se suman primas de seguros como dinero.
 
 El motor conserva `calculate_ordinary_payroll_2026` para el simulador manual de solo sueldo base y reutiliza la misma lógica para `calculate_ordinary_payroll_with_seniority_2026`, que recibe antigüedad mensual y extras anuales estimadas explícitas. No se incorporan parámetros flag ni valores por defecto. Sin modelos, migraciones o dependencias nuevas.
+
+
+## Seguros como retribución flexible
+
+El usuario confirma que los cuatro seguros sustituyen salario en dinero y que el ingreso a cuenta de la parte sujeta se repercute íntegramente al trabajador. El sueldo base registrado es anterior a esta sustitución. La aplicación no modela en este perfil un beneficio adicional a cargo de la empresa ni una mera deducción del líquido. La [AEAT distingue la retribución flexible pactada de la mediación en el pago](https://sede.agenciatributaria.gob.es/Sede/ayuda/manuales-videos-folletos/manuales-practicos/irpf-2025/c03-rendimientos-trabajo/rendimientos-trabajo-especie/concepto.html).
+
+Se mantiene el cálculo acordado de antigüedad sobre sueldo base + los cuatro seguros. El bruto ordinario total es sueldo base + antigüedad: **no se añaden otra vez los seguros**. El salario dinerario es ese bruto menos las cuatro primas; exentas y sujetas siguen formando parte de la remuneración cotizable, conforme al [artículo 147 LGSS](https://www.boe.es/buscar/act.php?id=BOE-A-2015-11724#a147). La prorrata de extras se añade a esa base como antes; los seguros no entran directamente en extras, solo mediante la antigüedad ya acordada.
+
+- **AE:** salario dinerario + seguro sujeto, equivalente al bruto total menos seguro exento. No se incorpora un ingreso a cuenta adicional al rendimiento porque se repercute al trabajador ([artículo 43 LIRPF](https://www.boe.es/buscar/act.php?id=BOE-A-2006-20764#a43)).
+- **BZ:** retención sobre dinero + ingreso a cuenta sobre especie sujeta, con el porcentaje informado. Ambos importes se redondean por separado y después se suman ([RIRPF, artículos 80 y 102](https://www.boe.es/buscar/act.php?id=BOE-A-2007-6820#a102)).
+- **CA/CG:** salario dinerario menos SS del trabajador, retención dineraria e ingreso a cuenta repercutido. El seguro se paga a la aseguradora, no al trabajador.
+- **CB:** bruto total + cuotas de empresa. No se vuelven a sumar las primas ni un ingreso a cuenta asumido por empresa: en este perfil lo soporta el trabajador.
+
+Al pulsar W, AE, BZ, CA, CB o CG aparece el desglose dinerario/en especie y las dos partidas fiscales. `calculate_flexible_payroll_2026` reutiliza cuotas y tipos de los calculadores anteriores; con seguros cero mantiene sus resultados. Rechaza primas ausentes, inválidas o que superen el bruto sustituido. No modifica las cantidades guardadas.
+
+La distribución exenta/sujeta la introduce el usuario, que debe verificar sus requisitos, beneficiarios y límites anuales. No se reclasifica automáticamente ni se certifican la exención, los límites de salario en especie o el SMI. El cálculo automático del tipo de IRPF y otros perfiles (seguro adicional de empresa, ingreso a cuenta asumido o deducción del líquido) siguen fuera de alcance. No hay modelos, migraciones ni dependencias nuevas. El complemento fijo positivo queda pendiente de confirmar su pago dinerario y periodicidad; cero sigue admitido.
