@@ -1,4 +1,4 @@
-"""Build semester accruals from the relationship's complete monthly history."""
+"""Build semester accruals from the relationship's monthly history and standard salary days."""
 
 from datetime import date
 from decimal import Decimal, localcontext
@@ -8,6 +8,7 @@ from payroll_engine.base_salary import (
     _calculation_context,
     base_salary_from_annual,
     base_salary_from_monthly,
+    standard_month_salary_days,
 )
 from payroll_engine.extra_payments import (
     InvalidExtraPaymentInput,
@@ -77,23 +78,34 @@ def _payment_cash(relationship, conditions, result, rounding):
 
 def _month_input(relationship, conditions, month, rounding):
     end = date(month.year + (month.month == 12), month.month % 12 + 1, 1)
-    if relationship.start_date > month or (
-        relationship.end_date and relationship.end_date < end
-    ):
-        raise InvalidExtraPaymentInput(
-            "relationship",
-            "Alta/baja o ausencia de relación durante parte del semestre: devengo parcial pendiente.",
+    salary_days = standard_month_salary_days(
+        relationship.start_date, relationship.end_date, month
+    )
+    if salary_days == 0:
+        modalities = {condition.payments_per_year for condition in conditions}
+        if len(modalities) != 1 or not modalities <= {12, 14}:
+            raise InvalidExtraPaymentInput(
+                "payments_per_year",
+                "No hay una modalidad única de 12 o 14 pagas para identificar los meses sin relación laboral.",
+            )
+        return ExtraAccrualMonth(
+            month, Decimal(0), Decimal(0), modalities.pop(), 0
         )
+    active_start = max(month, relationship.start_date)
+    active_end = min(end, relationship.end_date or end)
     covering = [
         condition
         for condition in conditions
-        if condition.valid_from <= month
-        and (condition.valid_until is None or condition.valid_until >= end)
+        if condition.valid_from <= active_start
+        and (
+            condition.valid_until is None
+            or condition.valid_until >= active_end
+        )
     ]
     if len(covering) != 1:
         raise InvalidExtraPaymentInput(
             "conditions",
-            "Falta un único periodo de condiciones que cubra todo el mes; puede haber huecos o cambios dentro del mes.",
+            "Falta un único periodo de condiciones que cubra todo el intervalo activo del mes; puede haber huecos o cambios dentro del mes.",
         )
     condition = covering[0]
     calculator = {
@@ -131,6 +143,7 @@ def _month_input(relationship, conditions, month, rounding):
         salary.ordinary_payment_amount,
         seniority.amount,
         condition.payments_per_year,
+        salary_days,
     )
 
 
@@ -159,6 +172,7 @@ def semester_extra(relationship, year, first_month, rounding, as_of_date):
                     "base_salary": item.base_salary,
                     "seniority": item.seniority,
                     "payments": item.payments_per_year,
+                    "salary_days": item.salary_days,
                 }
             )
     result = None
@@ -224,7 +238,17 @@ def annual_extra_estimate(relationship, year, rounding, as_of_date):
                 (semester["result"].amount for semester in semesters),
                 Decimal("0.00"),
             )
+    contribution_issues = []
+    if not issues and any(
+        row["salary_days"] != 30
+        for semester in semesters
+        for row in semester["rows"]
+    ):
+        contribution_issues.append(
+            "Devengo de extras conocido, pero la prorrata de cotización de una relación que no cubre todo el año sigue pendiente; no se aplica automáticamente el devengo parcial anual dividido entre doce."
+        )
     return {
+        "contribution_issues": contribution_issues,
         "amount": amount,
         "semesters": semesters,
         "issues": issues,

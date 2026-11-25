@@ -386,7 +386,7 @@ class PayrollReportTests(TestCase):
         self.assertEqual(row["salary_days"], 16)
         self.assertEqual(cells["O"]["value"], Decimal("1066.67"))
         self.assertTrue(cells["O"]["available"])
-        for code in ("P", "Q", "U", "CA", "AC", "BZ"):
+        for code in ("Q", "CA", "AC", "BZ"):
             self.assertFalse(cells[code]["available"])
         self.assertIn("nómina parcial completa", cells["CA"]["note"])
         detail = self.client.post(
@@ -422,6 +422,49 @@ class PayrollReportTests(TestCase):
                 "available"
             ]
         )
+
+    def test_partial_earnings_and_extra_detail_use_one_proration_without_unblocking_contributions(
+        self,
+    ):
+        self.relationship.start_date = date(2026, 2, 15)
+        self.relationship.seniority_date = date(2024, 2, 20)
+        self.relationship.save()
+        self.condition.valid_from = date(2026, 2, 15)
+        self.condition.fixed_supplement_cents = 20000
+        self.condition.save()
+        response = self.client.post(
+            self.url, {**self.values, "months": ["2", "3"]}
+        )
+        cells = {
+            cell["code"]: cell for cell in response.context["rows"][0]["cells"]
+        }
+        for code, expected in (
+            ("O", "1066.67"),
+            ("P", "53.33"),
+            ("U", "106.67"),
+            ("W", "1226.67"),
+        ):
+            with self.subTest(code=code):
+                self.assertTrue(cells[code]["available"])
+                self.assertEqual(cells[code]["value"], Decimal(expected))
+        self.assertEqual(
+            response.context["semester_extras"][0]["result"].amount,
+            Decimal("1586.67"),
+        )
+        march = {
+            cell["code"]: cell for cell in response.context["rows"][1]["cells"]
+        }
+        self.assertFalse(march["AC"]["available"])
+        self.assertIn("devengo parcial anual", march["AC"]["note"])
+        detail = self.client.post(
+            self.url,
+            {**self.values, "months": ["2"], "cell": cells["P"]["key"]},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertContains(detail, "100.00 ÷ 30 × 16 días")
+        self.assertNotContains(detail, "<!doctype html>")
+        self.assertContains(response, "Días / 30")
+        self.assertContains(response, "÷ 180")
 
     def setUp(self):
         self.user = get_user_model().objects.create_user(

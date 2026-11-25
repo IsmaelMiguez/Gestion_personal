@@ -43,7 +43,7 @@ def _scope_reasons(relationship, condition, start, end, year):
         relationship.end_date and relationship.end_date < end
     ):
         reasons.append(
-            "Sueldo base prorrateado con mes estándar de 30 días. La nómina parcial completa sigue pendiente de integrar cotizaciones, complementos, descuentos de seguros y extras."
+            "Sueldo base, antigüedad, complemento fijo y devengo de extras prorrateados con mes estándar de 30 días cuando sus datos están informados. La nómina parcial completa sigue pendiente de integrar cotizaciones y descuentos de seguros."
         )
     if condition is None:
         reasons.append(
@@ -151,10 +151,18 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                 relationship, condition, salary, start, rounding
             )
             values.update(seniority_values)
-            if salary_days < 30:
-                values["P"] = _pending(
+            if salary_days < 30 and "P" in seniority_values:
+                monthly_amount = seniority_values["P"]["value"]
+                values["P"] = value_cell(
                     "P",
-                    "Antigüedad del periodo parcial pendiente; el porcentaje G ya incorpora el tramo del mes del aniversario.",
+                    prorate_monthly_salary(
+                        monthly_amount, salary_days, rounding
+                    ),
+                    "Antigüedad mensual de referencia ÷ 30 × días salariales",
+                    seniority_values["P"]["operands"]
+                    + f" Prorrateo: {monthly_amount} ÷ 30 × {salary_days} días.",
+                    seniority_values["P"]["note"]
+                    + " Se prorratea una sola vez por los días de relación; no se vuelve a aplicar la jornada contractual.",
                 )
             if seniority_error:
                 reasons.append(seniority_error)
@@ -168,10 +176,10 @@ def report_row(relationship, year, month, rounding, extra_estimate):
             ):
                 amount = getattr(condition, name)
                 if amount is not None:
-                    if salary_days < 30:
+                    if salary_days < 30 and code != "U":
                         values[code] = _pending(
                             code,
-                            "Importe mensual registrado, pendiente de determinar su devengo o descuento en el periodo parcial; no se presupone el prorrateo del complemento ni de la prima del seguro.",
+                            "Importe mensual registrado, pendiente de determinar su descuento en el periodo parcial; no se presupone el prorrateo de la prima del seguro.",
                         )
                         continue
                     values[code] = value_cell(
@@ -185,6 +193,30 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                             else "Prima a cargo del trabajador que se descuenta del líquido después de SS e IRPF. La etiqueta histórica exento/sujeto no modifica la fiscalidad en este perfil."
                         ),
                     )
+            if salary_days < 30 and "U" in values:
+                monthly_amount = values["U"]["value"]
+                values["U"] = value_cell(
+                    "U",
+                    prorate_monthly_salary(
+                        monthly_amount, salary_days, rounding
+                    ),
+                    "Complemento fijo mensual ÷ 30 × días salariales",
+                    f"{monthly_amount} ÷ 30 × {salary_days} días.",
+                    "Complemento dinerario en doce mensualidades; no entra en antigüedad ni extras.",
+                )
+            if salary_days < 30 and all(
+                code in values and values[code]["available"]
+                for code in ("O", "P", "U")
+            ):
+                values["W"] = value_cell(
+                    "W",
+                    sum(values[code]["value"] for code in ("O", "P", "U")),
+                    "Sueldo base + antigüedad + complemento fijo del periodo",
+                    " + ".join(
+                        str(values[code]["value"]) for code in ("O", "P", "U")
+                    ),
+                    "Bruto devengado conocido. Cotizaciones, IRPF y líquido del periodo parcial continúan pendientes.",
+                )
             if not reasons:
                 if salary.annual_amount > MAX_INPUT_AMOUNT:
                     reasons.append(
@@ -192,6 +224,7 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                     )
             estimated_extras = Decimal("0.00")
             if condition.payments_per_year == 14:
+                reasons.extend(extra_estimate.get("contribution_issues", []))
                 estimated_extras = extra_estimate["amount"]
                 if estimated_extras is None:
                     reasons.extend(

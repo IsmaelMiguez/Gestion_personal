@@ -11,7 +11,7 @@ from ..models import (
     EmploymentCondition,
     EmploymentRelationship,
 )
-from ..payroll_semester import semester_extra
+from ..payroll_semester import annual_extra_estimate, semester_extra
 
 
 class SemesterExtraReportTests(TestCase):
@@ -137,13 +137,16 @@ class SemesterExtraReportTests(TestCase):
         )
         self.assertIsNone(report["result"])
         self.assertEqual(len(report["rows"]), 6)
-        self.assertIn("todo el mes", report["rows"][2]["issue"])
+        self.assertIn(
+            "todo el intervalo activo del mes", report["rows"][2]["issue"]
+        )
         self.assertTrue(all("accrued" not in row for row in report["rows"]))
         self.relationship.start_date = date(2026, 1, 15)
         report = semester_extra(
             self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 7, 1)
         )
-        self.assertIn("Alta/baja", report["rows"][0]["issue"])
+        self.assertEqual(report["rows"][0]["salary_days"], 16)
+        self.assertNotIn("issue", report["rows"][0])
 
     def test_leap_anniversary_is_resolved_but_missing_insurance_or_transition_is_pending(
         self,
@@ -225,3 +228,48 @@ class SemesterExtraReportTests(TestCase):
         response = self.client.post(url, {**values, "months": ["7"]})
         self.assertEqual(len(response.context["semester_extras"]), 2)
         self.assertContains(response, "Extra de Julio 2026")
+
+    def test_hire_weights_february_accrual_and_keeps_partial_year_contribution_pending(
+        self,
+    ):
+        self.relationship.start_date = date(2026, 2, 15)
+        self.relationship.seniority_date = date(2024, 2, 20)
+        self.relationship.save()
+        self.condition.valid_from = date(2026, 2, 15)
+        self.condition.fixed_supplement_cents = 20000
+        self.condition.save()
+        with self.assertNumQueries(1):
+            report = semester_extra(
+                self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 8, 1)
+            )
+        self.assertEqual(report["result"].amount, Decimal("1586.67"))
+        self.assertEqual(
+            [row["salary_days"] for row in report["rows"]],
+            [0, 16, 30, 30, 30, 30],
+        )
+        self.assertEqual(report["rows"][1]["seniority"], Decimal(100))
+        self.assertEqual(report["rows"][1]["accrued"], Decimal("186.67"))
+        estimate = annual_extra_estimate(
+            self.relationship, 2026, ROUND_HALF_UP, date(2026, 8, 1)
+        )
+        self.assertEqual(estimate["amount"], Decimal("3686.67"))
+        self.assertEqual(estimate["issues"], [])
+        self.assertIn("cotización", estimate["contribution_issues"][0])
+
+    def test_termination_keeps_accrued_gross_and_does_not_invent_post_termination_payment(
+        self,
+    ):
+        self.relationship.end_date = date(2026, 2, 16)
+        self.relationship.save()
+        self.condition.valid_until = date(2026, 2, 16)
+        self.condition.save()
+        report = semester_extra(
+            self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 8, 1)
+        )
+        self.assertEqual(report["result"].amount, Decimal("500.00"))
+        self.assertEqual(
+            [row["salary_days"] for row in report["rows"]],
+            [30, 15, 0, 0, 0, 0],
+        )
+        self.assertIsNone(report["payment"])
+        self.assertIn("liquidación", report["payment_issue"])

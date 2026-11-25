@@ -14,7 +14,7 @@ class SemesterExtraTests(TestCase):
     def setUp(self):
         self.months = tuple(
             ExtraAccrualMonth(
-                date(2026, month, 1), Decimal(2000), Decimal(735), 14
+                date(2026, month, 1), Decimal(2000), Decimal(735), 14, 30
             )
             for month in range(1, 7)
         )
@@ -111,3 +111,63 @@ class SemesterExtraTests(TestCase):
             self.assertEqual(result.amount, Decimal("2735.00"))
             self.assertEqual(context.prec, 3)
             self.assertTrue(context.traps[Inexact])
+
+    def test_partial_hire_and_termination_weight_references_by_days_over_180(
+        self,
+    ):
+        references = tuple(
+            replace(item, seniority=Decimal(100)) for item in self.months
+        )
+        for days, expected in (
+            ((0, 16, 30, 30, 30, 30), "1586.67"),
+            ((30, 15, 0, 0, 0, 0), "525.00"),
+            ((0, 0, 0, 0, 0, 0), "0.00"),
+        ):
+            months = tuple(
+                replace(
+                    item,
+                    salary_days=count,
+                    base_salary=item.base_salary if count else Decimal(0),
+                    seniority=item.seniority if count else Decimal(0),
+                )
+                for item, count in zip(references, days, strict=True)
+            )
+            with self.subTest(days=days):
+                result = calculate_semester_extra(months, ROUND_HALF_UP)
+                self.assertEqual(result.amount, Decimal(expected))
+                self.assertEqual(
+                    tuple(line.salary_days for line in result.lines), days
+                )
+                self.assertEqual(
+                    result.rounded_months_total + result.rounding_difference,
+                    result.amount,
+                )
+                twelve = tuple(
+                    replace(item, payments_per_year=12) for item in months
+                )
+                self.assertEqual(
+                    calculate_semester_extra(twelve, ROUND_HALF_UP).amount,
+                    Decimal(0),
+                )
+
+    def test_partial_days_must_be_explicit_and_zero_days_cannot_hide_salary(
+        self,
+    ):
+        for days in (None, True, -1, 31, Decimal("16.5"), "16"):
+            with self.subTest(days=days):
+                with self.assertRaises(InvalidExtraPaymentInput) as raised:
+                    calculate_semester_extra(
+                        (
+                            replace(self.months[0], salary_days=days),
+                            *self.months[1:],
+                        ),
+                        ROUND_HALF_UP,
+                    )
+                self.assertEqual(
+                    raised.exception.field, "months[0].salary_days"
+                )
+        with self.assertRaises(InvalidExtraPaymentInput):
+            calculate_semester_extra(
+                (replace(self.months[0], salary_days=0), *self.months[1:]),
+                ROUND_HALF_UP,
+            )
