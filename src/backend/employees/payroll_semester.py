@@ -9,7 +9,10 @@ from payroll_engine.base_salary import (
     base_salary_from_annual,
     base_salary_from_monthly,
 )
-from payroll_engine.extra_payments import InvalidExtraPaymentInput
+from payroll_engine.extra_payments import (
+    InvalidExtraPaymentInput,
+    calculate_extra_payment_cash,
+)
 from payroll_engine.semester_extras import (
     ExtraAccrualMonth,
     calculate_semester_extra,
@@ -18,6 +21,58 @@ from payroll_engine.seniority import (
     InvalidSeniorityInput,
     calculate_monthly_seniority,
 )
+
+from .payroll_scope import monthly_contract_issues
+
+
+def _payment_cash(relationship, conditions, result, rounding):
+    start = result.payment_month
+    end = date(start.year + (start.month == 12), start.month % 12 + 1, 1)
+    if start.year != 2026:
+        return (
+            None,
+            "El pago fuera de 2026 queda pendiente de verificar su alcance.",
+        )
+    if relationship.start_date > start or (
+        relationship.end_date and relationship.end_date < end
+    ):
+        return (
+            None,
+            "No hay relación laboral durante todo el mes de pago: liquidación o pago tras baja pendiente.",
+        )
+    covering = [
+        condition
+        for condition in conditions
+        if condition.valid_from <= start
+        and (condition.valid_until is None or condition.valid_until >= end)
+    ]
+    if len(covering) != 1:
+        return (
+            None,
+            "No hay condiciones únicas para todo el mes de pago. Falta concretar la fecha efectiva de pago y el IRPF aplicable.",
+        )
+    condition = covering[0]
+    issues = monthly_contract_issues(condition)
+    if condition.payments_per_year != 14:
+        issues.append(
+            "La modalidad del mes de pago no es de catorce pagas: transición pendiente."
+        )
+    if condition.withholding_rate_basis_points is None:
+        issues.append(
+            "Falta el porcentaje IRPF informado para el mes de pago."
+        )
+    if issues:
+        return None, " ".join(issues)
+    try:
+        with localcontext(_calculation_context(rounding)):
+            payment = calculate_extra_payment_cash(
+                result.amount,
+                Decimal(condition.withholding_rate_basis_points) / 100,
+                rounding,
+            )
+    except InvalidExtraPaymentInput as error:
+        return None, str(error)
+    return payment, ""
 
 
 def _month_input(relationship, conditions, month, rounding):
@@ -117,6 +172,12 @@ def semester_extra(relationship, year, first_month, rounding, as_of_date):
                 row["reference"] = line.reference_amount
                 row["accrued"] = line.accrued_amount
     end = date(year, 7, 1) if first_month == 1 else date(year + 1, 1, 1)
+    payment = None
+    payment_issue = ""
+    if result is not None and result.payments_per_year == 14:
+        payment, payment_issue = _payment_cash(
+            relationship, conditions, result, rounding
+        )
     return {
         "company": relationship.company,
         "employee": relationship.employee,
@@ -127,6 +188,8 @@ def semester_extra(relationship, year, first_month, rounding, as_of_date):
         "rows": rows,
         "issues": issues,
         "result": result,
+        "payment": payment,
+        "payment_issue": payment_issue,
         "projected": end > as_of_date,
         "as_of_date": as_of_date,
     }

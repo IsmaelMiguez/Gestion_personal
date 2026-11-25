@@ -26,7 +26,7 @@ class EmploymentConditionForm(forms.ModelForm):
     salary_amount = euro_field("Sueldo base (€)")
     salary_amount.help_text = (
         "Importe correspondiente a la jornada habitual del contrato, "
-        "sin antigüedad ni complementos y antes de sustituir dinero por seguros flexibles. "
+        "sin antigüedad ni complementos. Los seguros se descuentan del líquido después de calcular SS e IRPF. "
         "No lo conviertas a jornada completa si el contrato es a tiempo parcial."
     )
     employee_insurance_exempt = euro_field("Seguro trabajador exento (€/mes)")
@@ -34,6 +34,10 @@ class EmploymentConditionForm(forms.ModelForm):
     family_insurance_exempt = euro_field("Seguro familia exento (€/mes)")
     family_insurance_taxable = euro_field("Seguro familia sujeto (€/mes)")
     fixed_supplement = euro_field("Complemento fijo (€/mes)")
+    fixed_supplement.help_text = (
+        "Importe dinerario adicional en cada uno de los doce meses; informa 0 si no existe. Procede de EMPLEADOS!P3 y CALCULO_2026!U3; los 24 trabajadores del Excel tienen 0. "
+        "Cotiza y tributa; no se incluye en extras ni en la base de antigüedad."
+    )
     withholding_rate = forms.DecimalField(
         label="IRPF (%)",
         decimal_places=2,
@@ -58,9 +62,9 @@ class EmploymentConditionForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for storage_name in EmploymentCondition.money_fields[1:5]:
             self.fields[storage_name.removesuffix("_cents")].help_text = (
-                "Prima mensual que sustituye salario en dinero (retribución flexible). "
-                "El ingreso a cuenta de la parte sujeta se descuenta al trabajador. "
-                "La clasificación exenta/sujeta debe estar comprobada; no se validan límites anuales."
+                "Prima mensual a cargo del trabajador que se descuenta del líquido tras SS e IRPF. "
+                "No reduce el bruto ni la base IRPF y no genera ingreso a cuenta. "
+                "Las etiquetas exento/sujeto se conservan para identificar los importes registrados."
             )
         for storage_name in EmploymentCondition.money_fields:
             name = storage_name.removesuffix("_cents")
@@ -68,6 +72,12 @@ class EmploymentConditionForm(forms.ModelForm):
             self.initial[name] = (
                 Decimal(value) / 100 if value is not None else None
             )
+            if (
+                self.instance._state.adding
+                and storage_name in EmploymentCondition.money_fields[1:]
+                and value is None
+            ):
+                self.initial[name] = Decimal("0.00")
         rate = self.instance.withholding_rate_basis_points
         self.initial["withholding_rate"] = (
             Decimal(rate) / 100 if rate is not None else None
@@ -80,6 +90,13 @@ class EmploymentConditionForm(forms.ModelForm):
             name = storage_name.removesuffix("_cents")
             if name in self.cleaned_data:
                 value = self.cleaned_data[name]
+                if (
+                    self.instance._state.adding
+                    and storage_name in EmploymentCondition.money_fields[1:]
+                    and value is None
+                ):
+                    value = Decimal("0.00")
+                    self.cleaned_data[name] = value
                 setattr(
                     self.instance,
                     storage_name,

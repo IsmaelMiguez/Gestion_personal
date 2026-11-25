@@ -1,10 +1,12 @@
 from datetime import date
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import Client, TestCase
 from django.urls import reverse
 
+from ..forms import EmploymentConditionForm
 from ..models import (
     Company,
     Employee,
@@ -68,6 +70,15 @@ class EmployeeRegistrationTests(TestCase):
             "employment_relationship",
             response.context["condition_form"].fields,
         )
+        for storage_name in EmploymentCondition.money_fields[1:]:
+            name = storage_name.removesuffix("_cents")
+            self.assertEqual(
+                response.context["condition_form"][name].value(),
+                Decimal("0.00"),
+            )
+        self.assertIsNone(
+            response.context["condition_form"]["salary_amount"].value()
+        )
 
     def test_registration_saves_linked_records_and_redirects(self):
         response = self.client.post(self.url, self.payload)
@@ -82,8 +93,40 @@ class EmployeeRegistrationTests(TestCase):
         self.assertEqual(condition.salary_amount_cents, 250001)
         self.assertEqual(condition.employee_insurance_exempt_cents, 4219)
         self.assertEqual(condition.fixed_supplement_cents, 0)
-        self.assertIsNone(condition.family_insurance_exempt_cents)
+        self.assertEqual(condition.family_insurance_exempt_cents, 0)
         self.assertEqual(condition.withholding_rate_basis_points, 1937)
+
+    def test_registration_defaults_omitted_or_empty_insurances_and_supplement_to_zero(
+        self,
+    ):
+        payload = self.payload.copy()
+        for index, storage_name in enumerate(
+            EmploymentCondition.money_fields[1:]
+        ):
+            name = "condition-" + storage_name.removesuffix("_cents")
+            payload.pop(name, None)
+            if index % 2:
+                payload[name] = ""
+        response = self.client.post(self.url, payload)
+        self.assertEqual(response.status_code, 302)
+        condition = EmploymentCondition.objects.get()
+        for storage_name in EmploymentCondition.money_fields[1:]:
+            self.assertEqual(getattr(condition, storage_name), 0)
+
+    def test_editing_existing_conditions_preserves_amounts_and_unknown_values(
+        self,
+    ):
+        self.client.post(self.url, self.payload)
+        condition = EmploymentCondition.objects.get()
+        condition.fixed_supplement_cents = 12500
+        condition.family_insurance_exempt_cents = None
+        condition.save()
+        form = EmploymentConditionForm(instance=condition)
+        self.assertEqual(form["fixed_supplement"].value(), Decimal("125.00"))
+        self.assertEqual(
+            form["employee_insurance_exempt"].value(), Decimal("42.19")
+        )
+        self.assertIsNone(form["family_insurance_exempt"].value())
 
     def test_htmx_success_redirects_to_full_detail(self):
         response = self.client.post(

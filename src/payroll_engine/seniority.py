@@ -1,6 +1,6 @@
 """Initial seniority schedule agreed for this project, not a universal rule."""
 
-from calendar import isleap, monthrange
+from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal, localcontext
@@ -14,14 +14,11 @@ class InvalidSeniorityInput(ValueError):
         super().__init__(message)
 
 
-class UnresolvedSeniorityPeriod(InvalidSeniorityInput):
-    """The period needs an effective-date policy that is not agreed yet."""
-
-
 @dataclass(frozen=True, slots=True)
 class MonthlySeniority:
     years_at_start: int
     years_at_end: int
+    effective_years: int
     percentage: Decimal
     calculation_base: Decimal
     amount: Decimal
@@ -54,7 +51,7 @@ def _completed_years(recognized_date: date, reference: date) -> int:
 def monthly_seniority_percentage(
     recognized_date: date, month_start: date
 ) -> Decimal:
-    """Return a stable monthly rate; leave effective-date decisions explicit."""
+    """Apply the seniority step throughout its anniversary month."""
     for name, value in (
         ("recognized_date", recognized_date),
         ("month_start", month_start),
@@ -67,34 +64,21 @@ def monthly_seniority_percentage(
         raise InvalidSeniorityInput(
             "month_start", "El periodo debe comenzar el día 1 del mes."
         )
-    if recognized_date > month_start:
-        raise InvalidSeniorityInput(
-            "recognized_date",
-            "La antigüedad reconocida es posterior al inicio del mes.",
-        )
     month_end = date(
         month_start.year,
         month_start.month,
         monthrange(month_start.year, month_start.month)[1],
     )
-    first_years = _completed_years(recognized_date, month_start)
-    last_years = _completed_years(recognized_date, month_end)
-    if (
-        (recognized_date.month, recognized_date.day) == (2, 29)
-        and not isleap(month_start.year)
-        and month_start.month == 2
-    ):
-        if _percentage(last_years) != _percentage(last_years + 1):
-            raise UnresolvedSeniorityPeriod(
-                "recognized_date",
-                "Antigüedad del 29 de febrero: falta acordar el aniversario en años no bisiestos.",
-            )
-    if _percentage(first_years) != _percentage(last_years):
-        raise UnresolvedSeniorityPeriod(
-            "month_start",
-            "Cambio de tramo de antigüedad dentro del mes: falta acordar la fecha de efectos.",
+    if recognized_date > month_end:
+        raise InvalidSeniorityInput(
+            "recognized_date",
+            "La antigüedad reconocida es posterior al mes calculado.",
         )
-    return _percentage(first_years)
+    return _percentage(
+        month_start.year
+        - recognized_date.year
+        - (month_start.month < recognized_date.month)
+    )
 
 
 def calculate_monthly_seniority(
@@ -141,6 +125,9 @@ def calculate_monthly_seniority(
         return MonthlySeniority(
             _completed_years(recognized_date, month_start),
             _completed_years(recognized_date, last_day),
+            month_start.year
+            - recognized_date.year
+            - (month_start.month < recognized_date.month),
             percentage,
             base,
             (base * percentage / 100).quantize(CENT),

@@ -1,4 +1,4 @@
-"""Extra-payment references for constant conditions, before semester accrual."""
+"""Extra-payment composition and cash payment, separate from ordinary payroll."""
 
 from dataclasses import dataclass
 from decimal import Decimal, localcontext
@@ -10,6 +10,19 @@ class InvalidExtraPaymentInput(ValueError):
     def __init__(self, field: str, message: str):
         self.field = field
         super().__init__(message)
+
+
+def _validate_amount(amount: Decimal, field: str) -> None:
+    if (
+        not isinstance(amount, Decimal)
+        or not amount.is_finite()
+        or not Decimal(0) <= amount <= MAX_INPUT_AMOUNT
+        or amount != amount.quantize(CENT)
+    ):
+        raise InvalidExtraPaymentInput(
+            field,
+            "Indica un Decimal finito no negativo, dentro del límite monetario y sin fracciones de céntimo.",
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,20 +55,8 @@ def calculate_extra_payment_reference(
             raise InvalidExtraPaymentInput(
                 "payments_per_year", "Indica 12 o 14 pagas como número entero."
             )
-        for name, amount in (
-            ("ordinary_base_salary", ordinary_base_salary),
-            ("monthly_seniority", monthly_seniority),
-        ):
-            if (
-                not isinstance(amount, Decimal)
-                or not amount.is_finite()
-                or not Decimal(0) <= amount <= MAX_INPUT_AMOUNT
-                or amount != amount.quantize(CENT)
-            ):
-                raise InvalidExtraPaymentInput(
-                    name,
-                    "Indica un Decimal finito no negativo, dentro del límite monetario y sin fracciones de céntimo.",
-                )
+        _validate_amount(ordinary_base_salary, "ordinary_base_salary")
+        _validate_amount(monthly_seniority, "monthly_seniority")
         count = payments_per_year - 12
         amount = (
             ordinary_base_salary + monthly_seniority
@@ -70,5 +71,45 @@ def calculate_extra_payment_reference(
             annual,
             monthly,
             annual - monthly * 12,
+            rounding,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ExtraPaymentCash:
+    gross_amount: Decimal
+    withholding_rate: Decimal
+    withholding_amount: Decimal
+    net_amount: Decimal
+    rounding: str
+
+
+def calculate_extra_payment_cash(
+    gross_amount: Decimal, withholding_rate: Decimal, rounding: str
+) -> ExtraPaymentCash:
+    """Apply the informed payment-month rate to a cash extra.
+
+    Social Security is accounted for in ordinary monthly proration. This
+    calculation neither repeats those deductions nor pays monthly insurance
+    or the fixed supplement again. It does not record an actual payment.
+    """
+    with localcontext(_calculation_context(rounding)):
+        _validate_amount(gross_amount, "gross_amount")
+        if (
+            not isinstance(withholding_rate, Decimal)
+            or not withholding_rate.is_finite()
+            or not Decimal(0) <= withholding_rate <= Decimal(100)
+            or withholding_rate != withholding_rate.quantize(CENT)
+        ):
+            raise InvalidExtraPaymentInput(
+                "withholding_rate",
+                "Indica un porcentaje Decimal entre 0 y 100, con hasta dos decimales.",
+            )
+        withholding = (gross_amount * withholding_rate / 100).quantize(CENT)
+        return ExtraPaymentCash(
+            gross_amount,
+            withholding_rate,
+            withholding,
+            gross_amount - withholding,
             rounding,
         )

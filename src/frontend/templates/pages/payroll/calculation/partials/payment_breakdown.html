@@ -1,15 +1,17 @@
-<section class="border rounded-3 bg-body-tertiary p-3 mb-3" aria-label="Desglose dinerario y en especie">
+<section class="border rounded-3 bg-body-tertiary p-3 mb-3" aria-label="Desglose del bruto y descuentos del líquido">
   <h3 class="h5">Del bruto al ingreso bancario</h3>
   <dl class="row mb-0">
-    <dt class="col-sm-8">Bruto ordinario antes de retribución flexible</dt><dd class="col-sm-4 text-sm-end">{{ payment.gross_amount|floatformat:"2g" }} €</dd>
-    <dt class="col-sm-8">Seguro exento informado</dt><dd class="col-sm-4 text-sm-end">{{ payment.insurance_exempt_amount|floatformat:"2g" }} €</dd>
-    <dt class="col-sm-8">Seguro sujeto informado</dt><dd class="col-sm-4 text-sm-end">{{ payment.insurance_taxable_amount|floatformat:"2g" }} €</dd>
-    <dt class="col-sm-8">Bruto dinerario (bruto − ambos seguros)</dt><dd class="col-sm-4 text-sm-end">{{ payment.cash_gross_amount|floatformat:"2g" }} €</dd>
-    <dt class="col-sm-8">Valoración sujeta a IRPF (dinero + especie sujeta)</dt><dd class="col-sm-4 text-sm-end">{{ payment.taxable_gross_amount|floatformat:"2g" }} €</dd>
-    <dt class="col-sm-8">Retención dineraria</dt><dd class="col-sm-4 text-sm-end">{{ payment.cash_withholding_amount|floatformat:"2g" }} €</dd>
-    <dt class="col-sm-8">Ingreso a cuenta repercutido</dt><dd class="col-sm-4 text-sm-end">{{ payment.payment_on_account_amount|floatformat:"2g" }} €</dd>
-    <dt class="col-sm-8">Seguridad Social del trabajador</dt><dd class="col-sm-4 text-sm-end">{{ payment.employee_contributions|floatformat:"2g" }} €</dd>
-    <dt class="col-sm-8 text-success-emphasis">Líquido en dinero</dt><dd class="col-sm-4 text-sm-end fw-bold text-success-emphasis">{{ payment.net_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Sueldo base ordinario</dt><dd class="col-sm-4 text-sm-end">{{ payment.salary.ordinary_payment_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Antigüedad</dt><dd class="col-sm-4 text-sm-end">{{ payment.seniority_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Complemento fijo dinerario mensual</dt><dd class="col-sm-4 text-sm-end">{{ payment.fixed_supplement_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Bruto ordinario y base IRPF</dt><dd class="col-sm-4 text-sm-end">{{ payment.gross_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Seguridad Social del trabajador</dt><dd class="col-sm-4 text-sm-end">− {{ payment.employee_contributions|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">IRPF sobre el bruto completo</dt><dd class="col-sm-4 text-sm-end">− {{ payment.withholding_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8 fw-bold">Líquido antes de seguros</dt><dd class="col-sm-4 text-sm-end fw-bold">{{ payment.net_before_insurance|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Seguros registrados como exentos (descuento del líquido)</dt><dd class="col-sm-4 text-sm-end">− {{ payment.insurance_exempt_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8">Seguros registrados como sujetos (descuento del líquido)</dt><dd class="col-sm-4 text-sm-end">− {{ payment.insurance_taxable_amount|floatformat:"2g" }} €</dd>
+    <dt class="col-sm-8 text-success-emphasis">Importe a transferir tras seguros</dt><dd class="col-sm-4 text-sm-end fw-bold text-success-emphasis">{{ payment.net_amount|floatformat:"2g" }} €</dd>
   </dl>
-  <p class="small text-body-secondary mb-0">El seguro se paga a la aseguradora, no al trabajador. Cotiza dentro del bruto total, incluida su parte exenta de IRPF. El ingreso a cuenta se descuenta al trabajador y no se suma al coste de empresa. Cada importe fiscal se redondea por separado.</p>
+  <p class="small text-body-secondary mb-0">Primero se calculan SS e IRPF sobre el sueldo y sus complementos; después se descuentan los seguros del líquido. Las etiquetas históricas exento/sujeto no producen una exención ni un ingreso a cuenta en este perfil. Las primas no se añaden al coste de empresa.</p>
+  {% if payment.net_amount < 0 %}<p class="alert alert-warning mt-3 mb-0">El líquido no cubre los descuentos: revisa el saldo negativo antes de preparar un pago.</p>{% endif %}
 </section>

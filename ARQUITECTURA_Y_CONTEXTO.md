@@ -2113,3 +2113,43 @@ calculate_flexible_payroll_2026 comparte cuotas/topes/solidaridad con los calcul
 Se amplía el objeto inmutable de resultado con seguro exento/sujeto/total, bruto dinerario, valoración fiscal y las dos partidas fiscales, sin nuevas entidades persistentes. La tabla deja de bloquear totales por seguros positivos, conserva los bloqueos por importes ausentes y muestra su conciliación al abrir W/AE/BZ/CA/CB/CG. Formularios y descripción de API aclaran que el sueldo es previo a la sustitución y las primas son mensuales. No se cambia ninguna cantidad guardada ni se presuponen seguros cero.
 
 Verificación: cinco pruebas del motor para sustitución de efectivo, exención sin reducción de cotización, redondeo fiscal separado, errores/límites de importe y regresión/contexto; dos de integración para las cuatro primas, antigüedad, SS/IRPF/neto/coste, detalle HTMX, preservación de datos y primas superiores al bruto. 110 pruebas de aplicación y 44 del motor correctas; Ruff, formato, Django y ausencia de migraciones comprobados. Lectura de los dos trabajadores de desarrollo sin cambios: ambos ya producen totales; para el segundo, líquido ordinario simulado 5833.40 con las entradas guardadas. Sin commits; pendiente revisión visual y contraste oficial. Complemento fijo positivo pendiente de respuesta.
+
+
+## Anexo AH. Complemento fijo, conciliación y líquido de extras (23/11/2026)
+
+El usuario confirma provisionalmente que el complemento fijo se paga en dinero cada uno de los doce meses, además del sueldo base, y autoriza continuar en el orden propuesto. Se implementan los tres primeros incrementos: complemento en nómina, controles de conciliación y simulación de abono separado de extras. Las reglas para periodos parciales/aniversarios se preguntan antes de implementarlas y no se asume una opción sin respuesta.
+
+El complemento se incorpora como importe mensual explícito al resultado y al motor, suma al bruto/dinero, bases de cotización, retención, líquido y coste; no entra en antigüedad, extras o su prorrata. Se conservan doce pagos incluso cuando el sueldo base tenga catorce. Los calculadores base anteriores usan cero explícito; calculate_flexible_payroll_2026 recibe fixed_supplement requerido. No cambia la estructura persistente.
+
+reconciliation.py devuelve nueve balances aritméticos con diferencia y estado, sin transformar errores en ceros. CJ muestra OK/REVISAR y su tarjeta muestra bruto, dinero/especie, fiscalidad, cuotas, base, líquido y coste. No es certificación normativa ni pretende resolver controles específicos de NCM del Excel. Las pruebas perturban un líquido para verificar que se identifica la discrepancia de un céntimo.
+
+calculate_extra_payment_cash aplica a la extra bruta el tipo IRPF informado del mes de pago y devuelve retención y líquido. Se consultan artículos 78/80 RIRPF sobre retención al abonar y Orden PJC/297/2026 artículo 1 sobre prorrata de cotización. No se duplican cuotas SS, primas de seguros, ingresos a cuenta de los seguros o complemento fijo en la extra. El lector del semestre conserva el devengo aunque falten condiciones o IRPF para el pago; se exige mes de pago completo con condiciones únicas, perfil mensual ordinario 2026 y catorce pagas. El tipo de los meses de devengo no sustituye al tipo del pago. Doce pagas no genera otro abono. La interfaz indica simulación, no pago acreditado, y mantiene las proyecciones visibles.
+
+Se extraen las comprobaciones comunes del contrato mensual a payroll_scope.py para reutilizarlas en mensualidad y abono de extra sin duplicar las reglas. Nuevas comprobaciones cubren complemento con seguro, exclusión de antigüedad/extras, errores, balances, fiscalidad de extra, falta de tipo/fecha y alternativa de doce pagas. 113 pruebas de aplicación y 49 del motor correctas. Sin modelos/migraciones/dependencias nuevas ni commits; pendiente revisión visual y contraste oficial. NCM, altas/bajas parciales, aniversarios con cambio dentro del mes y bonus/regularizaciones no se declaran completados.
+
+
+## Acuerdo de antigüedad y convenio — 24/11/2026
+
+Los incrementos de antigüedad producen efectos desde el mes siguiente al aniversario, incluso si este cae el día 1. El motor aplica esta regla tanto en nóminas ordinarias como en los meses que forman el devengo de extras. Se conservan los bienios, topes y base previamente acordados. Los aniversarios del 29 de febrero necesitan concretar su fecha en años no bisiestos únicamente cuando esa elección cambia el porcentaje del mes.
+
+El usuario indica convenio de oficinas. Sigue pendiente identificar la provincia o el código de convenio y consultar su texto aplicable antes de elegir el divisor para altas y bajas a mitad de mes. No se presupone un divisor de 30 ni de días naturales.
+
+
+## Anexo AI. Rectificación de seguros, antigüedad y divisor de salario (25/11/2026)
+
+Este acuerdo sustituye el tratamiento de seguros del anexo AG y la fecha de efectos acordada el 24/11. El convenio identificado por el usuario es oficinas y despachos de Pontevedra, código 36001005011983. No se transforma automáticamente el perfil de 12/14 pagas en el régimen de pagas del convenio: sus diferencias requieren revisión separada.
+
+Los seguros son descuentos del líquido: se calcula primero bruto, SS e IRPF ordinarios y después se restan las cuatro primas para obtener la transferencia. No hay sustitución salarial, reducción de base IRPF por primas exentas ni ingreso a cuenta por primas sujetas. Las etiquetas exento/sujeto se mantienen para conservar los datos existentes, sin diferencias fiscales en este perfil. No se añaden las primas al coste de empresa. Se mantiene la base de antigüedad confirmada previamente (sueldo base más cuatro seguros), porque esta aclaración no la modifica. El resultado distingue líquido previo a seguros y transferencia final, incluidos saldos negativos visibles.
+
+La antigüedad se aplica en el propio mes del aniversario desde el día 1, tanto en mensualidad como en devengo de extras. Para el 29 de febrero el mes de efectos también es febrero, sea o no bisiesto. La tabla de porcentajes y topes no cambia.
+
+El divisor de prorrateo confirmado es 30. La función pura prorate_monthly_salary exige explícitamente días entre 0 y 30 y redondeo, y redondea una sola vez el resultado de mensual ÷ 30 × días. Se consulta cómo contar el alta del 15 de febrero (16 días de mes estándar o 14 naturales) antes de automatizar el conteo y la nómina parcial; no se publica una nómina completa con reglas de cotización/devengo parcial sin terminar.
+
+Origen verificado del complemento fijo: EMPLEADOS!P3 y CALCULO_2026!U3. Los 24 empleados y los 336 importes de cálculo contienen cero. Se conserva como importe adicional opcional con el tratamiento dinerario mensual previamente aprobado. No hay cambios de modelos, migraciones ni importes de base de datos.
+
+
+## Anexo AJ. Mes estándar también en febrero (25/11/2026)
+
+El usuario confirma que febrero se cuenta como mes estándar para prorratear el sueldo. standard_month_salary_days cuenta el intervalo activo sobre un calendario salarial de 30 días, independiente de la duración natural del mes. Un alta el 15 hasta fin de febrero son 16 días, tanto en año común como bisiesto. El último día del mes cierra el día 30 y el día 31 se normaliza al 30 sin crear un día salarial adicional. Los fines de relación siguen siendo exclusivos; último día trabajado 15 equivale a fin 16. Fuera de la relación se cuentan cero días.
+
+La tabla selecciona condiciones únicas que cubran todo el intervalo activo y muestra O = mensual ÷ 30 × días, con redondeo solo al final y operandos en su tarjeta. No cambia las cuantías contractuales. G conserva el tramo de antigüedad del mes; I/J son referencias de mes completo. P/Q/R/S/T/U y los totales de nómina parcial permanecen pendientes, porque el divisor del sueldo no define por sí mismo las cotizaciones, el devengo de complementos/primas ni las extras de esos periodos. Se evita publicar importes mensuales completos como si fueran importes devengados por una fracción del mes. La cotización continúa restringida al supuesto de mes completo hasta su siguiente incremento. Sin cambios de estructura, modelos o migraciones.

@@ -87,7 +87,7 @@ class EmploymentConditionSerializer(ValidatedModelSerializer):
         label="Sueldo base (€)",
         help_text=(
             "Sueldo base de la jornada habitual contratada. "
-            "Antigüedad y complementos van aparte. Los seguros flexibles sustituyen parte del sueldo dinerario; no se suman de nuevo al bruto."
+            "Antigüedad y complementos van aparte. Los seguros se descuentan del líquido tras SS e IRPF, sin reducir el bruto ni la base IRPF."
         ),
     )
     employee_insurance_exempt = HundredthsField(

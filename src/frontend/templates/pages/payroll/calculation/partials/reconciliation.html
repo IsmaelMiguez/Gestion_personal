@@ -1,0 +1,11 @@
+<section class="border rounded-3 p-3 mb-3" aria-label="Controles de conciliación">
+  <h3 class="h5">Controles aritméticos</h3>
+  <div class="table-responsive"><table class="table table-sm align-middle">
+    <thead><tr><th scope="col">Control</th><th scope="col">Identidad comprobada</th><th scope="col">Diferencia (€)</th><th scope="col">Estado</th></tr></thead>
+    <tbody>{% for check in checks %}<tr>
+      <th scope="row">{{ check.label }}</th><td>{{ check.equation }}</td><td>{{ check.difference|floatformat:"2g" }}</td>
+      <td><span class="badge {% if check.balanced %}text-bg-success{% else %}text-bg-danger{% endif %}">{% if check.balanced %}OK{% else %}REVISAR{% endif %}</span></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  <p class="small text-body-secondary mb-0">Los controles verifican que las cifras concilian entre sí; no validan la normativa ni convierten los cálculos pendientes en resultados correctos.</p>
+</section>

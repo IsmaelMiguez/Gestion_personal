@@ -22,7 +22,18 @@
     </table></div>
     {% if extra.result %}<p class="small mb-1">Suma de devengos mensuales redondeados: {{ extra.result.rounded_months_total|floatformat:"2g" }} €. Conciliación con el total: {{ extra.result.rounding_difference|floatformat:"2g" }} €.</p>
     <p class="small mb-1">Redondeo: {{ extra.result.rounding }}. La diferencia no se asigna automáticamente a ningún mes.</p>{% endif %}
-    <p class="small text-body-secondary mb-0">Solo sueldo base y antigüedad, usando las condiciones de cada mes. Consulta sin incidencias declaradas; no registra un pago ni calcula retenciones de la extra. Un cambio entre 12/14 pagas, un mes incompleto o una regla de antigüedad sin resolver deja el total pendiente.</p>
+    {% if extra.payment %}
+      <section class="bg-success-subtle border border-success-subtle rounded-3 p-3 my-3" aria-label="Simulación de abono de la extra">
+        <h4 class="h6">Simulación de abono · {{ extra.payment_label }} {{ extra.year }}</h4>
+        <dl class="row mb-0">
+          <dt class="col-sm-8">Extra bruta</dt><dd class="col-sm-4 text-sm-end">{{ extra.payment.gross_amount|floatformat:"2g" }} €</dd>
+          <dt class="col-sm-8">IRPF informado para el mes de pago ({{ extra.payment.withholding_rate|floatformat:2 }} %)</dt><dd class="col-sm-4 text-sm-end">{{ extra.payment.withholding_amount|floatformat:"2g" }} €</dd>
+          <dt class="col-sm-8">Líquido separado de la extra</dt><dd class="col-sm-4 text-sm-end fw-bold">{{ extra.payment.net_amount|floatformat:"2g" }} €</dd>
+        </dl>
+        <p class="small mb-0">Bruto − IRPF = líquido. No se repiten seguros, complemento fijo ni cuotas SS: la cotización de extras se calcula en las mensualidades ordinarias. El porcentaje es el informado para julio/diciembre, no el de los meses de devengo. Esta simulación no acredita que se haya pagado.</p>
+      </section>
+    {% elif extra.payment_issue %}<div class="alert alert-warning mt-3">Abono pendiente: {{ extra.payment_issue }} El devengo bruto conocido se conserva.</div>{% endif %}
+    <p class="small text-body-secondary mb-0">Solo sueldo base y antigüedad, usando las condiciones de cada mes. Consulta sin incidencias declaradas; no registra pagos. Un cambio entre 12/14 pagas, un mes incompleto o datos de antigüedad sin informar deja el total pendiente.</p>
   </div>
 </article>
 {% endlanguage %}

@@ -5,6 +5,7 @@ reductions and absences are separate inputs for later calculation stages.
 """
 
 from dataclasses import dataclass
+from datetime import date, timedelta
 from decimal import Context, Decimal, localcontext
 
 CENT = Decimal("0.01")
@@ -102,3 +103,62 @@ def base_salary_from_monthly(
         return _breakdown(
             annual_amount, payment_amount, payments_per_year, rounding
         )
+
+
+def prorate_monthly_salary(
+    amount: Decimal, salary_days: int, rounding: str
+) -> Decimal:
+    """Prorate a monthly amount using the explicitly agreed divisor of 30.
+
+    Days must already have been counted according to the applicable payroll
+    calendar. Round the final amount, never the daily rate before multiplying.
+    """
+    with localcontext(_calculation_context(rounding)):
+        _validate_input(amount, 12)
+        if type(salary_days) is not int or not 0 <= salary_days <= 30:
+            raise InvalidBaseSalaryInput(
+                "salary_days", "Indica un número entero de días entre 0 y 30."
+            )
+        return (amount / 30 * salary_days).quantize(CENT)
+
+
+def standard_month_salary_days(
+    employment_start: date, employment_end: date | None, month_start: date
+) -> int:
+    """Count a salary month as 30 days, including February.
+
+    The end date is exclusive, as in the employment model. The last calendar
+    day closes day 30; day 31 occupies day 30 rather than adding a 31st day.
+    This salary convention does not define Social Security contribution days.
+    """
+    for field, value in (
+        ("employment_start", employment_start),
+        ("month_start", month_start),
+    ):
+        if type(value) is not date:
+            raise InvalidBaseSalaryInput(field, "Indica una fecha sin hora.")
+    if employment_end is not None:
+        if (
+            type(employment_end) is not date
+            or employment_end <= employment_start
+        ):
+            raise InvalidBaseSalaryInput(
+                "employment_end",
+                "El fin exclusivo debe ser posterior al inicio.",
+            )
+    if month_start.day != 1:
+        raise InvalidBaseSalaryInput(
+            "month_start", "El mes debe comenzar el día 1."
+        )
+    month_end = date(
+        month_start.year + (month_start.month == 12),
+        month_start.month % 12 + 1,
+        1,
+    )
+    start = max(employment_start, month_start)
+    end = min(employment_end or month_end, month_end)
+    if start >= end:
+        return 0
+    last_day = end - timedelta(days=1)
+    end_day = 30 if end == month_end else min(last_day.day, 30)
+    return max(0, end_day - min(start.day, 30) + 1)

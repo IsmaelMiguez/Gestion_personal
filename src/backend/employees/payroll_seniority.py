@@ -12,8 +12,8 @@ from .payroll_report_values import value_cell
 
 PROFILE_NOTE = (
     "Perfil inicial de bienios y topes acordado para este proyecto; no es una tabla universal de convenios. "
-    "El complemento fijo no forma parte de esta base. El sueldo base se toma antes de la sustitución por seguros flexibles. "
-    "Se mantiene la base de antigüedad acordada: sueldo más los cuatro seguros. El pago efectivo de extras se mantiene separado."
+    "El complemento fijo no forma parte de esta base. Los seguros se descuentan del líquido, sin sustituir el sueldo base. "
+    "Se mantiene la base de antigüedad acordada: sueldo más los cuatro seguros. Los cambios de tramo se aplican desde el primer día del mes del aniversario. El pago efectivo de extras se mantiene separado."
 )
 
 
@@ -29,7 +29,7 @@ def seniority_cells(relationship, condition, salary, start, rounding):
         "G",
         percentage,
         "Tabla acordada: 5 % por bienio, con topes por antigüedad.",
-        f"Antigüedad reconocida: {relationship.seniority_date}; mes: {start:%m/%Y}; porcentaje estable: {percentage}%.",
+        f"Antigüedad reconocida: {relationship.seniority_date}; mes: {start:%m/%Y}; porcentaje aplicado: {percentage}%. El nuevo tramo se aplica a todo el mes del aniversario.",
         PROFILE_NOTE
         + " Se muestra en porcentaje, no como fracción del Excel.",
     )
@@ -61,7 +61,7 @@ def seniority_cells(relationship, condition, salary, start, rounding):
         result.amount,
         "(Sueldo base ordinario + cuatro seguros mensuales) × antigüedad ÷ 100",
         f"({salary.ordinary_payment_amount} + {' + '.join(str(Decimal(amount) / 100) for amount in amounts)}) × {result.percentage} ÷ 100; "
-        f"base = {result.calculation_base}; años completos al inicio/fin: {result.years_at_start}/{result.years_at_end}; resultado redondeado = {result.amount}.",
+        f"base = {result.calculation_base}; años completos al inicio/fin: {result.years_at_start}/{result.years_at_end}; años usados para el porcentaje del mes: {result.effective_years}; resultado redondeado = {result.amount}.",
         PROFILE_NOTE,
     )
     return cells, ""

@@ -1,5 +1,6 @@
 """Map calculated values to Excel columns with explanations from the same data."""
 
+from payroll_engine.reconciliation import reconcile_ordinary_payroll
 from payroll_engine.rules_2026 import MAXIMUM_BASE, MONTHLY_MINIMUM_BASES
 
 from .payroll_columns import COLUMNS
@@ -26,8 +27,8 @@ def result_cells(result, condition):
         (
             "W",
             gross,
-            "Sueldo base ordinario + antigüedad mensual",
-            f"{result.salary.ordinary_payment_amount} + {result.seniority_amount}",
+            "Sueldo base ordinario + antigüedad mensual + complemento fijo dinerario",
+            f"{result.salary.ordinary_payment_amount} + {result.seniority_amount} + {result.fixed_supplement_amount}",
         ),
         (
             "X",
@@ -56,8 +57,8 @@ def result_cells(result, condition):
         (
             "AE",
             result.taxable_gross_amount,
-            "Bruto dinerario + seguro en especie sujeto (sin ingreso a cuenta añadido, porque se repercute)",
-            f"{result.cash_gross_amount} + {result.insurance_taxable_amount} = {result.taxable_gross_amount}",
+            "Bruto ordinario completo; los seguros se descuentan después del líquido",
+            f"{gross} = {result.taxable_gross_amount}",
         ),
         (
             "BV",
@@ -84,15 +85,15 @@ def result_cells(result, condition):
         (
             "BZ",
             result.withholding_amount,
-            "Retención dineraria + ingreso a cuenta repercutido al trabajador",
-            f"({result.cash_gross_amount} × {result.withholding_rate} ÷ 100) = {result.cash_withholding_amount}; "
-            f"({result.insurance_taxable_amount} × {result.withholding_rate} ÷ 100) = {result.payment_on_account_amount}; total = {result.withholding_amount}",
+            "Bruto ordinario × tipo IRPF informado ÷ 100",
+            f"{gross} × {result.withholding_rate} ÷ 100 = {result.withholding_amount}",
         ),
         (
             "CA",
             result.net_amount,
-            "Bruto dinerario − SS trabajador − retención dineraria − ingreso a cuenta repercutido",
-            f"({gross} − seguros {result.insurance_amount}) − {result.employee_contributions} − {result.cash_withholding_amount} − {result.payment_on_account_amount} = {result.net_amount}",
+            "Bruto − SS trabajador − IRPF − seguros descontados del líquido",
+            f"{gross} − {result.employee_contributions} − {result.withholding_amount} = líquido previo {result.net_before_insurance}; "
+            f"{result.net_before_insurance} − {result.insurance_amount} = transferencia {result.net_amount}",
         ),
         (
             "CB",
@@ -115,11 +116,21 @@ def result_cells(result, condition):
     )
     for code, value, formula, operands in entries:
         cells[code] = value_cell(code, value, formula, operands, SOURCE)
+    checks = reconcile_ordinary_payroll(result, result.salary.rounding)
+    cells["CJ"] = value_cell(
+        "CJ",
+        "OK" if all(check.balanced for check in checks) else "REVISAR",
+        "Conciliación de bruto, descuentos de seguros, bases, cuotas, fiscalidad, líquido y coste",
+        "; ".join(
+            f"{check.label}: diferencia {check.difference}" for check in checks
+        ),
+        "Comprueba identidades aritméticas del caso soportado. No certifica normativa, exenciones ni conceptos todavía pendientes.",
+    )
+    cells["CJ"]["checks"] = checks
     for code in ("AE", "BZ", "CA"):
         cells[code]["note"] = (
-            "Retribución flexible confirmada: seguro en sustitución de salario dinerario, sin añadirlo de nuevo al bruto. "
-            "Ingreso a cuenta repercutido íntegramente al trabajador. LIRPF artículos 42–43 y RIRPF artículos 80 y 102. "
-            "La clasificación exenta/sujeta es informada: no se verifican automáticamente requisitos ni límites anuales."
+            "Seguros a cargo del trabajador descontados del líquido tras calcular SS e IRPF sobre el bruto completo. "
+            "Los campos históricos exento/sujeto identifican primas; no reducen la base IRPF ni generan ingreso a cuenta en este perfil."
         )
     for index, employee_code, employer_code in (
         (0, "AF", "AG"),

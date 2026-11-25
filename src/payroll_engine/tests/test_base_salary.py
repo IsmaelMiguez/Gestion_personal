@@ -1,3 +1,4 @@
+from datetime import date, datetime
 from decimal import (
     ROUND_DOWN,
     ROUND_HALF_UP,
@@ -12,6 +13,8 @@ from payroll_engine.base_salary import (
     InvalidBaseSalaryInput,
     base_salary_from_annual,
     base_salary_from_monthly,
+    prorate_monthly_salary,
+    standard_month_salary_days,
 )
 
 
@@ -133,3 +136,83 @@ class BaseSalaryTests(TestCase):
         self.assertEqual(result.annual_amount, Decimal("0.00"))
         self.assertEqual(result.ordinary_payment_amount, Decimal("0.00"))
         self.assertEqual(result.annual_rounding_difference, Decimal("0.00"))
+
+
+class MonthlySalaryProrationTests(TestCase):
+    def test_uses_thirty_days_and_rounds_only_the_final_amount(self):
+        for days, expected in ((0, "0.00"), (16, "1066.67"), (30, "2000.00")):
+            with self.subTest(days=days):
+                self.assertEqual(
+                    prorate_monthly_salary(Decimal(2000), days, ROUND_HALF_UP),
+                    Decimal(expected),
+                )
+        with localcontext() as context:
+            context.prec = 3
+            context.traps[Inexact] = True
+            self.assertEqual(
+                prorate_monthly_salary(Decimal(2000), 16, ROUND_DOWN),
+                Decimal("1066.66"),
+            )
+            self.assertEqual(context.prec, 3)
+
+    def test_rejects_invalid_days_and_money(self):
+        for days in (None, True, -1, 31, 15.5, "15"):
+            with self.subTest(days=days):
+                with self.assertRaises(InvalidBaseSalaryInput) as raised:
+                    prorate_monthly_salary(Decimal(2000), days, ROUND_HALF_UP)
+                self.assertEqual(raised.exception.field, "salary_days")
+        for amount in (
+            None,
+            2000.0,
+            Decimal("NaN"),
+            Decimal(-1),
+            Decimal("1.001"),
+        ):
+            with self.subTest(amount=amount):
+                with self.assertRaises(InvalidBaseSalaryInput):
+                    prorate_monthly_salary(amount, 16, ROUND_HALF_UP)
+
+
+class StandardSalaryMonthTests(TestCase):
+    def test_february_and_other_months_use_the_same_thirty_day_calendar(self):
+        cases = (
+            (date(2026, 2, 1), None, date(2026, 2, 1), 30),
+            (date(2026, 2, 15), None, date(2026, 2, 1), 16),
+            (date(2028, 2, 15), None, date(2028, 2, 1), 16),
+            (date(2026, 2, 15), date(2026, 3, 1), date(2026, 2, 1), 16),
+            (date(2026, 1, 1), date(2026, 2, 16), date(2026, 2, 1), 15),
+            (date(2026, 2, 15), date(2026, 2, 21), date(2026, 2, 1), 6),
+            (date(2026, 2, 28), None, date(2026, 2, 1), 3),
+            (date(2026, 1, 15), None, date(2026, 1, 1), 16),
+            (date(2026, 1, 31), None, date(2026, 1, 1), 1),
+            (date(2026, 4, 15), None, date(2026, 4, 1), 16),
+            (date(2026, 12, 15), None, date(2026, 12, 1), 16),
+        )
+        for start, end, month, expected in cases:
+            with self.subTest(start=start, end=end, month=month):
+                self.assertEqual(
+                    standard_month_salary_days(start, end, month), expected
+                )
+
+    def test_no_employment_in_the_month_has_no_salary_days(self):
+        for start, end in (
+            (date(2026, 3, 1), None),
+            (date(2026, 1, 1), date(2026, 2, 1)),
+        ):
+            with self.subTest(start=start, end=end):
+                self.assertEqual(
+                    standard_month_salary_days(start, end, date(2026, 2, 1)), 0
+                )
+
+    def test_invalid_intervals_and_dates_are_rejected(self):
+        for start, end, month in (
+            (None, None, date(2026, 2, 1)),
+            (date(2026, 2, 1), "2026-03-01", date(2026, 2, 1)),
+            (date(2026, 2, 1), date(2026, 2, 1), date(2026, 2, 1)),
+            (date(2026, 2, 1), date(2026, 1, 1), date(2026, 2, 1)),
+            (date(2026, 2, 1), None, date(2026, 2, 2)),
+            (datetime(2026, 2, 1), None, date(2026, 2, 1)),
+        ):
+            with self.subTest(start=start, end=end, month=month):
+                with self.assertRaises(InvalidBaseSalaryInput):
+                    standard_month_salary_days(start, end, month)

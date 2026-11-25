@@ -3,11 +3,35 @@ from unittest import TestCase
 
 from payroll_engine.extra_payments import (
     InvalidExtraPaymentInput,
+    calculate_extra_payment_cash,
     calculate_extra_payment_reference,
 )
 
 
 class ExtraPaymentTests(TestCase):
+    def test_cash_extra_only_deducts_its_informed_tax(self):
+        result = calculate_extra_payment_cash(
+            Decimal("2735.00"), Decimal(20), ROUND_HALF_UP
+        )
+        self.assertEqual(result.withholding_amount, Decimal("547.00"))
+        self.assertEqual(result.net_amount, Decimal("2188.00"))
+        self.assertEqual(
+            result.net_amount + result.withholding_amount, result.gross_amount
+        )
+
+    def test_extra_payment_rejects_missing_gross_or_unknown_tax_rate(self):
+        for gross, rate, field in (
+            (None, Decimal(20), "gross_amount"),
+            (Decimal(1000), None, "withholding_rate"),
+            (Decimal(1000), Decimal("NaN"), "withholding_rate"),
+            (Decimal(1000), Decimal("100.01"), "withholding_rate"),
+            (Decimal(1000), Decimal("15.001"), "withholding_rate"),
+        ):
+            with self.subTest(gross=gross, rate=rate):
+                with self.assertRaises(InvalidExtraPaymentInput) as raised:
+                    calculate_extra_payment_cash(gross, rate, ROUND_HALF_UP)
+                self.assertEqual(raised.exception.field, field)
+
     def test_fourteen_payments_include_base_and_calculated_seniority(self):
         result = calculate_extra_payment_reference(
             Decimal(2000), Decimal(735), 14, ROUND_HALF_UP

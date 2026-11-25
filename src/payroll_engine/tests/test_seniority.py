@@ -4,7 +4,6 @@ from unittest import TestCase
 
 from payroll_engine.seniority import (
     InvalidSeniorityInput,
-    UnresolvedSeniorityPeriod,
     calculate_monthly_seniority,
     monthly_seniority_percentage,
 )
@@ -45,7 +44,7 @@ class SeniorityTests(TestCase):
             with self.subTest(years=years):
                 self.assertEqual(
                     monthly_seniority_percentage(
-                        date(2026 - years, 1, 1), date(2026, 1, 1)
+                        date(2026 - years, 1, 1), date(2026, 2, 1)
                     ),
                     Decimal(percentage),
                 )
@@ -54,7 +53,7 @@ class SeniorityTests(TestCase):
         self,
     ):
         result = calculate_monthly_seniority(
-            date(2011, 1, 1),
+            date(2010, 12, 1),
             date(2026, 1, 1),
             Decimal("2000.00"),
             (Decimal(10), Decimal(20), Decimal(30), Decimal(40)),
@@ -64,30 +63,48 @@ class SeniorityTests(TestCase):
         self.assertEqual(result.calculation_base, Decimal(2100))
         self.assertEqual(result.amount, Decimal(735))
 
-    def test_rate_change_inside_month_is_pending_but_frozen_rate_is_stable(
-        self,
-    ):
-        with self.assertRaises(UnresolvedSeniorityPeriod):
-            monthly_seniority_percentage(date(2024, 1, 15), date(2026, 1, 1))
+    def test_anniversary_changes_apply_to_the_entire_same_month(self):
+        for day in (1, 15, 31):
+            with self.subTest(day=day):
+                recognized = date(2024, 1, day)
+                self.assertEqual(
+                    monthly_seniority_percentage(
+                        recognized, date(2025, 12, 1)
+                    ),
+                    Decimal(0),
+                )
+                self.assertEqual(
+                    monthly_seniority_percentage(recognized, date(2026, 1, 1)),
+                    Decimal(5),
+                )
+        self.assertEqual(
+            monthly_seniority_percentage(
+                date(2023, 12, 31), date(2025, 12, 1)
+            ),
+            Decimal(5),
+        )
         self.assertEqual(
             monthly_seniority_percentage(date(2015, 1, 15), date(2026, 1, 1)),
             Decimal(25),
         )
         self.assertEqual(
-            monthly_seniority_percentage(date(2024, 2, 1), date(2026, 1, 1)),
+            monthly_seniority_percentage(date(2026, 1, 31), date(2026, 1, 1)),
+            Decimal(0),
+        )
+
+    def test_leap_anniversary_applies_in_february_in_all_years(self):
+        recognized = date(2024, 2, 29)
+        self.assertEqual(
+            monthly_seniority_percentage(recognized, date(2026, 1, 1)),
             Decimal(0),
         )
         self.assertEqual(
-            monthly_seniority_percentage(date(2024, 2, 1), date(2026, 2, 1)),
+            monthly_seniority_percentage(recognized, date(2026, 2, 1)),
             Decimal(5),
         )
-
-    def test_leap_anniversary_needs_a_rule_if_it_changes_the_rate(self):
-        with self.assertRaises(UnresolvedSeniorityPeriod):
-            monthly_seniority_percentage(date(2024, 2, 29), date(2026, 2, 1))
         self.assertEqual(
-            monthly_seniority_percentage(date(2024, 2, 29), date(2026, 3, 1)),
-            Decimal(5),
+            monthly_seniority_percentage(recognized, date(2028, 2, 1)),
+            Decimal(10),
         )
 
     def test_dates_and_missing_money_are_not_silently_replaced(self):
@@ -130,7 +147,7 @@ class SeniorityTests(TestCase):
             context.prec = 3
             context.traps[Inexact] = True
             result = calculate_monthly_seniority(
-                date(2024, 1, 1),
+                date(2023, 12, 1),
                 date(2026, 1, 1),
                 Decimal("1000.10"),
                 (Decimal(0),) * 4,
@@ -139,7 +156,7 @@ class SeniorityTests(TestCase):
             self.assertEqual(result.amount, Decimal("50.01"))
             self.assertEqual(context.prec, 3)
             other = calculate_monthly_seniority(
-                date(2024, 1, 1),
+                date(2023, 12, 1),
                 date(2026, 1, 1),
                 Decimal("1000.10"),
                 (Decimal(0),) * 4,

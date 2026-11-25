@@ -15,6 +15,55 @@ from ..payroll_semester import semester_extra
 
 
 class SemesterExtraReportTests(TestCase):
+    def test_extra_payment_uses_payment_month_tax_and_excludes_monthly_supplement(
+        self,
+    ):
+        self.condition.contribution_group = 5
+        self.condition.withholding_rate_basis_points = 1500
+        self.condition.fixed_supplement_cents = 50000
+        self.condition.valid_until = date(2026, 7, 1)
+        self.condition.save()
+        self.condition.pk = None
+        self.condition.valid_from = date(2026, 7, 1)
+        self.condition.valid_until = None
+        self.condition.withholding_rate_basis_points = 2000
+        self.condition.save()
+        report = semester_extra(
+            self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 8, 1)
+        )
+        self.assertEqual(report["result"].amount, Decimal(2000))
+        self.assertEqual(report["payment"].withholding_rate, Decimal(20))
+        self.assertEqual(report["payment"].withholding_amount, Decimal(400))
+        self.assertEqual(report["payment"].net_amount, Decimal(1600))
+        self.assertEqual(report["payment_issue"], "")
+
+    def test_extra_keeps_gross_when_payment_tax_or_date_is_unknown(self):
+        self.condition.contribution_group = 5
+        self.condition.save()
+        report = semester_extra(
+            self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 8, 1)
+        )
+        self.assertEqual(report["result"].amount, Decimal(2000))
+        self.assertIsNone(report["payment"])
+        self.assertIn("IRPF", report["payment_issue"])
+        self.condition.withholding_rate_basis_points = 1500
+        self.condition.valid_until = date(2026, 7, 15)
+        self.condition.save()
+        report = semester_extra(
+            self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 8, 1)
+        )
+        self.assertIsNone(report["payment"])
+        self.assertIn("fecha efectiva de pago", report["payment_issue"])
+        self.condition.valid_until = None
+        self.condition.payments_per_year = 12
+        self.condition.save()
+        report = semester_extra(
+            self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 8, 1)
+        )
+        self.assertEqual(report["result"].amount, Decimal(0))
+        self.assertIsNone(report["payment"])
+        self.assertEqual(report["payment_issue"], "")
+
     def setUp(self):
         self.company = Company.objects.create(
             name="Empresa", tax_id="SEMESTER"
@@ -96,16 +145,16 @@ class SemesterExtraReportTests(TestCase):
         )
         self.assertIn("Alta/baja", report["rows"][0]["issue"])
 
-    def test_unresolved_seniority_unknown_insurance_and_payment_transition_remain_pending(
+    def test_leap_anniversary_is_resolved_but_missing_insurance_or_transition_is_pending(
         self,
     ):
-        self.relationship.seniority_date = date(2024, 3, 15)
+        self.relationship.seniority_date = date(2024, 2, 29)
         self.relationship.save()
         report = semester_extra(
             self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 7, 1)
         )
-        self.assertIsNone(report["result"])
-        self.assertIn("fecha de efectos", report["rows"][2]["issue"])
+        self.assertIsNotNone(report["result"])
+        self.assertEqual(report["rows"][1]["seniority"], Decimal(100))
         self.relationship.seniority_date = date(2026, 1, 1)
         self.relationship.save()
         self.condition.employee_insurance_exempt_cents = None

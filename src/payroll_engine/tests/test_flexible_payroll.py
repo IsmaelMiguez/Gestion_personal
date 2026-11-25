@@ -3,13 +3,13 @@ from unittest import TestCase
 
 from payroll_engine.ordinary_payroll import (
     InvalidPayrollInput,
-    calculate_flexible_payroll_2026,
+    calculate_ordinary_payroll_with_insurance_deductions_2026,
 )
 
 
-class FlexiblePayrollTests(TestCase):
-    def test_flexible_insurance_replaces_cash_and_recharges_tax(self):
-        result = calculate_flexible_payroll_2026(
+class InsuranceDeductionPayrollTests(TestCase):
+    def test_insurance_is_deducted_after_payroll_tax_and_contributions(self):
+        result = calculate_ordinary_payroll_with_insurance_deductions_2026(
             Decimal(28000),
             14,
             Decimal(100),
@@ -20,17 +20,18 @@ class FlexiblePayrollTests(TestCase):
             Decimal(15),
             Decimal("1.50"),
             ROUND_HALF_UP,
+            fixed_supplement=Decimal(0),
         )
         self.assertEqual(result.gross_amount, Decimal(2100))
         self.assertEqual(result.insurance_amount, Decimal(100))
-        self.assertEqual(result.cash_gross_amount, Decimal(2000))
-        self.assertEqual(result.taxable_gross_amount, Decimal(2050))
+        self.assertEqual(result.cash_gross_amount, Decimal(2100))
+        self.assertEqual(result.taxable_gross_amount, Decimal(2100))
         self.assertEqual(result.common_contribution_base, Decimal(2450))
         self.assertEqual(result.employee_contributions, Decimal("159.26"))
-        self.assertEqual(result.cash_withholding_amount, Decimal(300))
-        self.assertEqual(result.payment_on_account_amount, Decimal("7.50"))
-        self.assertEqual(result.withholding_amount, Decimal("307.50"))
-        self.assertEqual(result.net_amount, Decimal("1533.24"))
+        self.assertEqual(result.cash_withholding_amount, Decimal(315))
+        self.assertEqual(result.net_before_insurance, Decimal("1625.74"))
+        self.assertEqual(result.withholding_amount, Decimal("315.00"))
+        self.assertEqual(result.net_amount, Decimal("1525.74"))
         self.assertEqual(result.employer_cash_cost, Decimal("2887.68"))
         self.assertEqual(
             result.net_amount
@@ -40,22 +41,25 @@ class FlexiblePayrollTests(TestCase):
             result.gross_amount,
         )
 
-    def test_exempt_or_taxable_insurance_does_not_remove_it_from_social_security(
+    def test_legacy_exempt_taxable_split_changes_neither_tax_nor_social_security(
         self,
     ):
-        for exempt, taxable, tax in ((100, 0, "300.00"), (0, 100, "315.00")):
+        for exempt, taxable, tax in ((100, 0, "315.00"), (0, 100, "315.00")):
             with self.subTest(exempt=exempt, taxable=taxable):
-                result = calculate_flexible_payroll_2026(
-                    Decimal(28000),
-                    14,
-                    Decimal(100),
-                    Decimal(4200),
-                    Decimal(exempt),
-                    Decimal(taxable),
-                    5,
-                    Decimal(15),
-                    Decimal("1.50"),
-                    ROUND_HALF_UP,
+                result = (
+                    calculate_ordinary_payroll_with_insurance_deductions_2026(
+                        Decimal(28000),
+                        14,
+                        Decimal(100),
+                        Decimal(4200),
+                        Decimal(exempt),
+                        Decimal(taxable),
+                        5,
+                        Decimal(15),
+                        Decimal("1.50"),
+                        ROUND_HALF_UP,
+                        fixed_supplement=Decimal(0),
+                    )
                 )
                 self.assertEqual(
                     result.common_contribution_base, Decimal(2450)
@@ -64,8 +68,8 @@ class FlexiblePayrollTests(TestCase):
                 self.assertEqual(result.gross_amount, Decimal(2100))
                 self.assertEqual(result.employer_cash_cost, Decimal("2887.68"))
 
-    def test_cash_retention_and_payment_on_account_round_separately(self):
-        result = calculate_flexible_payroll_2026(
+    def test_withholding_is_rounded_once_before_insurance_deduction(self):
+        result = calculate_ordinary_payroll_with_insurance_deductions_2026(
             Decimal("14.40"),
             12,
             Decimal(0),
@@ -76,12 +80,12 @@ class FlexiblePayrollTests(TestCase):
             Decimal(5),
             Decimal("1.50"),
             ROUND_HALF_UP,
+            fixed_supplement=Decimal(0),
         )
         self.assertEqual(result.cash_withholding_amount, Decimal("0.06"))
-        self.assertEqual(result.payment_on_account_amount, Decimal("0.01"))
-        self.assertEqual(result.withholding_amount, Decimal("0.07"))
+        self.assertEqual(result.withholding_amount, Decimal("0.06"))
 
-    def test_invalid_premiums_and_insurance_exceeding_salary_are_rejected(
+    def test_invalid_premiums_are_rejected_and_insufficient_net_is_not_hidden(
         self,
     ):
         for field in ("insurance_exempt", "insurance_taxable"):
@@ -101,7 +105,7 @@ class FlexiblePayrollTests(TestCase):
                     }
                     premiums[field] = value
                     with self.assertRaises(InvalidPayrollInput) as raised:
-                        calculate_flexible_payroll_2026(
+                        calculate_ordinary_payroll_with_insurance_deductions_2026(
                             Decimal(28000),
                             14,
                             Decimal(100),
@@ -111,28 +115,32 @@ class FlexiblePayrollTests(TestCase):
                             withholding_rate=Decimal(15),
                             occupational_risk_rate=Decimal("1.50"),
                             rounding=ROUND_HALF_UP,
+                            fixed_supplement=Decimal(0),
                         )
                     self.assertEqual(raised.exception.field, field)
-        with self.assertRaises(InvalidPayrollInput) as raised:
-            calculate_flexible_payroll_2026(
-                Decimal(28000),
-                14,
-                Decimal(0),
-                Decimal(4000),
-                Decimal(1500),
-                Decimal(1000),
-                5,
-                Decimal(15),
-                Decimal("1.50"),
-                ROUND_HALF_UP,
-            )
-        self.assertEqual(raised.exception.field, "insurance_amount")
+        payroll = calculate_ordinary_payroll_with_insurance_deductions_2026(
+            Decimal(28000),
+            14,
+            Decimal(0),
+            Decimal(4000),
+            Decimal(1500),
+            Decimal(1000),
+            5,
+            Decimal(15),
+            Decimal("1.50"),
+            ROUND_HALF_UP,
+            fixed_supplement=Decimal(0),
+        )
+        self.assertEqual(
+            payroll.net_amount, payroll.net_before_insurance - Decimal(2500)
+        )
+        self.assertLess(payroll.net_amount, 0)
 
     def test_zero_insurance_and_decimal_context_keep_the_previous_result(self):
         with localcontext() as context:
             context.prec = 3
             context.traps[Inexact] = True
-            result = calculate_flexible_payroll_2026(
+            result = calculate_ordinary_payroll_with_insurance_deductions_2026(
                 Decimal(28000),
                 14,
                 Decimal(700),
@@ -143,9 +151,9 @@ class FlexiblePayrollTests(TestCase):
                 Decimal(15),
                 Decimal("1.50"),
                 ROUND_HALF_UP,
+                fixed_supplement=Decimal(0),
             )
             self.assertEqual(result.net_amount, Decimal("2090.24"))
             self.assertEqual(result.cash_gross_amount, result.gross_amount)
-            self.assertEqual(result.payment_on_account_amount, Decimal(0))
             self.assertEqual(context.prec, 3)
             self.assertTrue(context.traps[Inexact])
