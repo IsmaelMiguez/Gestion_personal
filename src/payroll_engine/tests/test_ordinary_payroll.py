@@ -4,6 +4,7 @@ from unittest import TestCase
 from payroll_engine.ordinary_payroll import (
     InvalidPayrollInput,
     calculate_ordinary_payroll_2026,
+    calculate_period_contributions_2026,
 )
 
 
@@ -159,3 +160,104 @@ class OrdinaryPayrollTests(TestCase):
                         ROUND_HALF_UP,
                     )
                 self.assertEqual(raised.exception.field, "contribution_group")
+
+
+class PeriodContributionTests(TestCase):
+    def test_partial_year_extras_are_normalized_before_applying_contribution_days(
+        self,
+    ):
+        with localcontext() as context:
+            context.prec = 3
+            context.traps[Inexact] = True
+            result = calculate_period_contributions_2026(
+                Decimal("1066.67"),
+                Decimal("3511.11"),
+                316,
+                14,
+                5,
+                Decimal("1.50"),
+                ROUND_HALF_UP,
+            )
+            self.assertEqual(result.extra_payment_accrual, Decimal("155.56"))
+            self.assertEqual(
+                result.common_contribution_base, Decimal("1222.23")
+            )
+            self.assertEqual(result.employee_contributions, Decimal("79.43"))
+            self.assertEqual(context.prec, 3)
+        march = calculate_period_contributions_2026(
+            Decimal(2000),
+            Decimal("3511.11"),
+            316,
+            30,
+            5,
+            Decimal("1.50"),
+            ROUND_HALF_UP,
+        )
+        self.assertEqual(march.extra_payment_accrual, Decimal("333.33"))
+
+    def test_period_limits_and_all_solidarity_bands_scale_to_contribution_days(
+        self,
+    ):
+        result = calculate_period_contributions_2026(
+            Decimal(4800),
+            Decimal(15800),
+            316,
+            14,
+            1,
+            Decimal(1),
+            ROUND_HALF_UP,
+        )
+        self.assertEqual(result.extra_payment_accrual, Decimal(700))
+        self.assertEqual(result.uncapped_contribution_base, Decimal(5500))
+        self.assertEqual(result.common_contribution_base, Decimal("2380.56"))
+        self.assertEqual(
+            tuple(line.base for line in result.contributions[-3:]),
+            (Decimal("238.06"), Decimal("952.22"), Decimal("1929.16")),
+        )
+        low = calculate_period_contributions_2026(
+            Decimal(100), Decimal(0), 360, 14, 1, Decimal(1), ROUND_HALF_UP
+        )
+        self.assertEqual(low.common_contribution_base, Decimal("928.34"))
+        self.assertEqual(low.professional_contribution_base, Decimal("664.72"))
+        for base in (
+            Decimal("2380.56"),
+            Decimal("2618.62"),
+            Decimal("3570.84"),
+        ):
+            with self.subTest(base=base):
+                edge = calculate_period_contributions_2026(
+                    base, Decimal(0), 360, 14, 1, Decimal(1), ROUND_HALF_UP
+                )
+                self.assertEqual(
+                    sum(line.base for line in edge.contributions[-3:]),
+                    max(Decimal(0), base - Decimal("2380.56")),
+                )
+
+    def test_invalid_days_group_and_money_are_rejected(self):
+        values = dict(
+            gross_amount=Decimal(1000),
+            estimated_annual_extras=Decimal(2000),
+            annual_salary_days=360,
+            contribution_days=15,
+            contribution_group=5,
+            occupational_risk_rate=Decimal(1),
+            rounding=ROUND_HALF_UP,
+        )
+        for field, invalid_values in (
+            ("annual_salary_days", (None, True, 0, 361)),
+            ("contribution_days", (None, True, 0, 31)),
+            ("contribution_group", (0, 8)),
+            (
+                "gross_amount",
+                (1000.0, Decimal("NaN"), Decimal(-1), Decimal("1.001")),
+            ),
+            ("estimated_annual_extras", (None, Decimal("Infinity"))),
+            ("occupational_risk_rate", (None, Decimal(101))),
+        ):
+            for value in invalid_values:
+                with self.subTest(field=field, value=value):
+                    with self.assertRaises(InvalidPayrollInput) as raised:
+                        calculate_period_contributions_2026(
+                            **{**values, field: value}
+                        )
+                    self.assertEqual(raised.exception.field, field)

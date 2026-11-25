@@ -238,17 +238,17 @@ def annual_extra_estimate(relationship, year, rounding, as_of_date):
                 (semester["result"].amount for semester in semesters),
                 Decimal("0.00"),
             )
-    contribution_issues = []
-    if not issues and any(
-        row["salary_days"] != 30
-        for semester in semesters
-        for row in semester["rows"]
-    ):
-        contribution_issues.append(
-            "Devengo de extras conocido, pero la prorrata de cotización de una relación que no cubre todo el año sigue pendiente; no se aplica automáticamente el devengo parcial anual dividido entre doce."
+    salary_days = (
+        sum(
+            row["salary_days"]
+            for semester in semesters
+            for row in semester["rows"]
         )
+        if not issues
+        else None
+    )
     return {
-        "contribution_issues": contribution_issues,
+        "annual_salary_days": salary_days,
         "amount": amount,
         "semesters": semesters,
         "issues": issues,

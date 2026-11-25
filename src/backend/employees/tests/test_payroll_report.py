@@ -387,8 +387,10 @@ class PayrollReportTests(TestCase):
         self.assertEqual(cells["O"]["value"], Decimal("1066.67"))
         self.assertTrue(cells["O"]["available"])
         for code in ("Q", "CA", "AC", "BZ"):
-            self.assertFalse(cells[code]["available"])
-        self.assertIn("nómina parcial completa", cells["CA"]["note"])
+            self.assertTrue(cells[code]["available"])
+        self.assertEqual(cells["AC"]["value"], Decimal("1222.23"))
+        self.assertEqual(cells["X"]["value"], Decimal("155.56"))
+        self.assertIn("Días cotizados: 14", cells["AC"]["note"])
         detail = self.client.post(
             self.url,
             {**self.values, "months": ["2"], "cell": cells["O"]["key"]},
@@ -415,7 +417,7 @@ class PayrollReportTests(TestCase):
         cells = {cell["code"]: cell for cell in february["cells"]}
         self.assertEqual(february["salary_days"], 15)
         self.assertEqual(cells["O"]["value"], Decimal("1000.00"))
-        self.assertFalse(cells["CA"]["available"])
+        self.assertTrue(cells["CA"]["available"])
         self.assertEqual(march["salary_days"], 0)
         self.assertFalse(
             next(cell for cell in march["cells"] if cell["code"] == "CA")[
@@ -423,7 +425,7 @@ class PayrollReportTests(TestCase):
             ]
         )
 
-    def test_partial_earnings_and_extra_detail_use_one_proration_without_unblocking_contributions(
+    def test_partial_earnings_and_contributions_use_their_respective_days(
         self,
     ):
         self.relationship.start_date = date(2026, 2, 15)
@@ -454,8 +456,8 @@ class PayrollReportTests(TestCase):
         march = {
             cell["code"]: cell for cell in response.context["rows"][1]["cells"]
         }
-        self.assertFalse(march["AC"]["available"])
-        self.assertIn("devengo parcial anual", march["AC"]["note"])
+        self.assertTrue(march["AC"]["available"])
+        self.assertEqual(march["X"]["value"], Decimal("350.00"))
         detail = self.client.post(
             self.url,
             {**self.values, "months": ["2"], "cell": cells["P"]["key"]},
@@ -465,6 +467,49 @@ class PayrollReportTests(TestCase):
         self.assertNotContains(detail, "<!doctype html>")
         self.assertContains(response, "Días / 30")
         self.assertContains(response, "÷ 180")
+
+    def test_partial_insurance_does_not_block_contributions_but_transfer_waits_for_policy(
+        self,
+    ):
+        self.relationship.start_date = date(2026, 2, 15)
+        self.relationship.seniority_date = date(2026, 2, 15)
+        self.relationship.save()
+        self.condition.valid_from = date(2026, 2, 15)
+        self.condition.employee_insurance_exempt_cents = 10000
+        self.condition.save()
+        response = self.client.post(
+            self.url, {**self.values, "months": ["2", "3"]}
+        )
+        february, march = [
+            {cell["code"]: cell for cell in row["cells"]}
+            for row in response.context["rows"]
+        ]
+        for code in ("AC", "BV", "BY", "BZ", "CB"):
+            self.assertTrue(february[code]["available"])
+        self.assertFalse(february["CA"]["available"])
+        self.assertTrue(march["CA"]["available"])
+        self.assertEqual(march["CA"]["value"], Decimal("1448.33"))
+        detail = self.client.post(
+            self.url,
+            {**self.values, "months": ["2"], "cell": february["X"]["key"]},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertContains(detail, "Días salariales y cotizados")
+        self.assertContains(detail, "3511.11 ÷ 316 × 14 = 155.56")
+        self.assertContains(detail, "días naturales de alta")
+        self.assertNotContains(
+            detail,
+            "La prorrata de cotización es este total dividido entre doce",
+        )
+        self.condition.withholding_rate_basis_points = None
+        self.condition.save()
+        response = self.client.post(self.url, {**self.values, "months": ["2"]})
+        cells = {
+            cell["code"]: cell for cell in response.context["rows"][0]["cells"]
+        }
+        self.assertTrue(cells["BV"]["available"])
+        self.assertFalse(cells["BZ"]["available"])
+        self.assertFalse(cells["CA"]["available"])
 
     def setUp(self):
         self.user = get_user_model().objects.create_user(

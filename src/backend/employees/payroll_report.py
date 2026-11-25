@@ -8,17 +8,23 @@ from payroll_engine.base_salary import (
     InvalidBaseSalaryInput,
     base_salary_from_annual,
     base_salary_from_monthly,
+    monthly_contribution_days,
     prorate_monthly_salary,
     standard_month_salary_days,
 )
 from payroll_engine.ordinary_payroll import (
     InvalidPayrollInput,
     calculate_ordinary_payroll_with_insurance_deductions_2026,
+    calculate_period_contributions_2026,
 )
 
 from .payroll_columns import COLUMNS
 from .payroll_extras import extra_reference_cell
-from .payroll_report_values import result_cells, value_cell
+from .payroll_report_values import (
+    period_result_cells,
+    result_cells,
+    value_cell,
+)
 from .payroll_scope import monthly_contract_issues
 from .payroll_seniority import seniority_cells
 
@@ -43,7 +49,7 @@ def _scope_reasons(relationship, condition, start, end, year):
         relationship.end_date and relationship.end_date < end
     ):
         reasons.append(
-            "Sueldo base, antigüedad, complemento fijo y devengo de extras prorrateados con mes estándar de 30 días cuando sus datos están informados. La nómina parcial completa sigue pendiente de integrar cotizaciones y descuentos de seguros."
+            "Sueldo base, antigüedad, complemento fijo y devengo de extras prorrateados con mes estándar de 30 días cuando sus datos están informados. La nómina parcial completa se calcula por conceptos; el descuento de seguros requiere concretar la prima aplicable."
         )
     if condition is None:
         reasons.append(
@@ -176,7 +182,7 @@ def report_row(relationship, year, month, rounding, extra_estimate):
             ):
                 amount = getattr(condition, name)
                 if amount is not None:
-                    if salary_days < 30 and code != "U":
+                    if salary_days < 30 and code != "U" and amount != 0:
                         values[code] = _pending(
                             code,
                             "Importe mensual registrado, pendiente de determinar su descuento en el periodo parcial; no se presupone el prorrateo de la prima del seguro.",
@@ -204,7 +210,7 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                     f"{monthly_amount} ÷ 30 × {salary_days} días.",
                     "Complemento dinerario en doce mensualidades; no entra en antigüedad ni extras.",
                 )
-            if salary_days < 30 and all(
+            if all(
                 code in values and values[code]["available"]
                 for code in ("O", "P", "U")
             ):
@@ -215,7 +221,7 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                     " + ".join(
                         str(values[code]["value"]) for code in ("O", "P", "U")
                     ),
-                    "Bruto devengado conocido. Cotizaciones, IRPF y líquido del periodo parcial continúan pendientes.",
+                    "Bruto devengado conocido. Los conceptos posteriores se calculan cuando sus datos y reglas están disponibles.",
                 )
             if not reasons:
                 if salary.annual_amount > MAX_INPUT_AMOUNT:
@@ -224,7 +230,6 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                     )
             estimated_extras = Decimal("0.00")
             if condition.payments_per_year == 14:
-                reasons.extend(extra_estimate.get("contribution_issues", []))
                 estimated_extras = extra_estimate["amount"]
                 if estimated_extras is None:
                     reasons.extend(
@@ -235,6 +240,65 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                 reasons.append(
                     "Cambio entre 12 y 14 pagas en el ejercicio: transición de cotización pendiente."
                 )
+            period_only = salary_days < 30 or (
+                condition.payments_per_year == 14
+                and extra_estimate["annual_salary_days"] != 360
+            )
+            if period_only:
+                reasons.append(
+                    "Cálculo por periodo de relación laboral. Cada concepto se publica cuando están disponibles sus datos; el líquido requiere conocer el descuento de seguros."
+                )
+            if (
+                period_only
+                and year == 2026
+                and not monthly_contract_issues(condition)
+                and condition.occupational_risk_rate is not None
+                and "W" in values
+                and values["W"]["available"]
+                and estimated_extras is not None
+                and len(extra_estimate["payment_modalities"]) <= 1
+            ):
+                days = monthly_contribution_days(
+                    relationship.start_date, relationship.end_date, start
+                )
+                annual_days = (
+                    extra_estimate["annual_salary_days"]
+                    if condition.payments_per_year == 14
+                    else 360
+                )
+                try:
+                    contributions = calculate_period_contributions_2026(
+                        values["W"]["value"],
+                        estimated_extras,
+                        annual_days,
+                        days,
+                        condition.contribution_group,
+                        condition.occupational_risk_rate,
+                        rounding,
+                    )
+                except InvalidPayrollInput as error:
+                    reasons.append(str(error))
+                else:
+                    period_cells = period_result_cells(
+                        contributions,
+                        condition,
+                        values["W"]["value"],
+                        salary_days,
+                    )
+                    for cell in period_cells.values():
+                        cell["contribution_period"] = {
+                            "salary_days": salary_days,
+                            "contribution_days": days,
+                            "annual_salary_days": annual_days,
+                            "estimated_extras": estimated_extras,
+                            "accrual": contributions.extra_payment_accrual,
+                        }
+                    values.update(period_cells)
+                    if condition.payments_per_year == 14:
+                        for code in ("X", "Z", "AC"):
+                            values[code]["annual_extra_estimate"] = (
+                                extra_estimate
+                            )
             if not reasons:
                 try:
                     result = calculate_ordinary_payroll_with_insurance_deductions_2026(

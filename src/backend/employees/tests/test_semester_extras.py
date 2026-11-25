@@ -229,7 +229,7 @@ class SemesterExtraReportTests(TestCase):
         self.assertEqual(len(response.context["semester_extras"]), 2)
         self.assertContains(response, "Extra de Julio 2026")
 
-    def test_hire_weights_february_accrual_and_keeps_partial_year_contribution_pending(
+    def test_hire_weights_february_accrual_and_records_annual_salary_days(
         self,
     ):
         self.relationship.start_date = date(2026, 2, 15)
@@ -254,7 +254,7 @@ class SemesterExtraReportTests(TestCase):
         )
         self.assertEqual(estimate["amount"], Decimal("3686.67"))
         self.assertEqual(estimate["issues"], [])
-        self.assertIn("cotización", estimate["contribution_issues"][0])
+        self.assertEqual(estimate["annual_salary_days"], 316)
 
     def test_termination_keeps_accrued_gross_and_does_not_invent_post_termination_payment(
         self,

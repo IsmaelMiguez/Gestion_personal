@@ -9,12 +9,23 @@
       {% if detail.operands %}<dt>Valores utilizados</dt><dd class="font-monospace text-break">{{ detail.operands }}</dd>{% endif %}
       <dt>Regla y observaciones</dt><dd>{{ detail.note }}</dd>
       <dt>Política de redondeo seleccionada</dt><dd>{{ detail.rounding }} · importes a céntimos cuando corresponda</dd></dl>
+      {% if detail.contribution_period %}
+        <section class="border rounded-3 bg-body-tertiary p-3 mb-3" aria-label="Días del periodo y cotización">
+          <h3 class="h5">Días salariales y cotizados</h3>
+          <dl class="row mb-0"><dt class="col-sm-8">Días salariales (mes estándar)</dt><dd class="col-sm-4">{{ detail.contribution_period.salary_days }}</dd>
+          <dt class="col-sm-8">Días cotizados (TGSS)</dt><dd class="col-sm-4">{{ detail.contribution_period.contribution_days }}</dd>
+          <dt class="col-sm-8">Días salariales cubiertos en la estimación anual</dt><dd class="col-sm-4">{{ detail.contribution_period.annual_salary_days }}</dd></dl>
+          <p class="small mb-0">En meses completos la cotización mensual se ajusta a 30 días. En altas/bajas dentro del mes se usan días naturales de alta. La regla salarial acordada de febrero no altera este cómputo.</p>
+        </section>
+      {% endif %}
       {% if detail.payment_breakdown %}{% include "pages/payroll/calculation/partials/payment_breakdown.html" with payment=detail.payment_breakdown only %}{% endif %}
       {% if detail.checks %}{% include "pages/payroll/calculation/partials/reconciliation.html" with checks=detail.checks only %}{% endif %}
       {% if detail.semester_extra %}{% include "pages/payroll/calculation/partials/semester_extra.html" with extra=detail.semester_extra only %}{% endif %}
       {% if detail.annual_extra_estimate %}
         <h3 class="h5">Origen de la estimación anual de extras</h3>
-        <p>Julio + diciembre = {{ detail.annual_extra_estimate.amount|floatformat:"2g" }} €. La prorrata de cotización es este total dividido entre doce; no el importe de un solo semestre dividido entre doce.</p>
+        <p>Julio + diciembre = {{ detail.annual_extra_estimate.amount|floatformat:"2g" }} €.
+        {% if detail.contribution_period %}La referencia diaria estimada es {{ detail.contribution_period.estimated_extras|floatformat:"2g" }} € ÷ {{ detail.contribution_period.annual_salary_days }} días salariales; se aplica a {{ detail.contribution_period.contribution_days }} días cotizados. Prorrata del periodo: {{ detail.contribution_period.accrual|floatformat:"2g" }} €.
+        {% else %}La prorrata de cotización es este total dividido entre doce; no el importe de un solo semestre dividido entre doce.{% endif %}</p>
         {% for extra in detail.annual_extra_estimate.semesters %}{% include "pages/payroll/calculation/partials/semester_extra.html" with extra=extra only %}{% endfor %}
       {% endif %}
       <p class="small text-body-secondary mb-0">Detalle recalculado con los filtros y datos actuales. Los campos monetarios se expresan en euros y los tipos en porcentaje.</p>

@@ -35,6 +35,20 @@ class Contribution:
 
 
 @dataclass(frozen=True, slots=True)
+class PeriodContributions:
+    estimated_annual_extra_amount: Decimal
+    annual_salary_days: int
+    contribution_days: int
+    extra_payment_accrual: Decimal
+    uncapped_contribution_base: Decimal
+    common_contribution_base: Decimal
+    professional_contribution_base: Decimal
+    contributions: tuple[Contribution, ...]
+    employee_contributions: Decimal
+    employer_contributions: Decimal
+
+
+@dataclass(frozen=True, slots=True)
 class OrdinaryPayroll:
     salary: BaseSalaryBreakdown
     seniority_amount: Decimal
@@ -48,6 +62,8 @@ class OrdinaryPayroll:
     cash_withholding_amount: Decimal
     net_before_insurance: Decimal
     estimated_annual_extra_amount: Decimal
+    annual_salary_days: int
+    contribution_days: int
     extra_payment_accrual: Decimal
     uncapped_contribution_base: Decimal
     common_contribution_base: Decimal
@@ -92,6 +108,7 @@ def _contributions(
     professional_base: Decimal,
     uncapped_base: Decimal,
     occupational_risk_rate: Decimal,
+    contribution_days: int,
 ) -> tuple[Contribution, ...]:
     lines = [
         _contribution(
@@ -112,6 +129,12 @@ def _contributions(
     for index, (lower, upper, employee_rate, employer_rate) in enumerate(
         rules.SOLIDARITY_BANDS, start=1
     ):
+        lower = (lower * contribution_days / 30).quantize(CENT)
+        upper = (
+            (upper * contribution_days / 30).quantize(CENT)
+            if upper.is_finite()
+            else upper
+        )
         base = max(Decimal("0.00"), min(uncapped_base, upper) - lower)
         lines.append(
             _contribution(
@@ -169,7 +192,6 @@ def _ordinary_payroll(
             )
         _validate_rate(withholding_rate, "withholding_rate")
         _validate_rate(occupational_risk_rate, "occupational_risk_rate")
-        accrual = (estimated_annual_extras / 12).quantize(CENT)
         gross = (
             salary.ordinary_payment_amount
             + monthly_seniority
@@ -178,23 +200,20 @@ def _ordinary_payroll(
         insurance = insurance_exempt + insurance_taxable
         cash_gross = gross
         taxable_gross = gross
-        uncapped = gross + accrual
-        common = min(
-            rules.MAXIMUM_BASE,
-            max(rules.MONTHLY_MINIMUM_BASES[contribution_group - 1], uncapped),
+        period = calculate_period_contributions_2026(
+            gross,
+            estimated_annual_extras,
+            360,
+            30,
+            contribution_group,
+            occupational_risk_rate,
+            rounding,
         )
-        professional = min(
-            rules.MAXIMUM_BASE, max(rules.MINIMUM_PROFESSIONAL_BASE, uncapped)
-        )
-        lines = _contributions(
-            common, professional, uncapped, occupational_risk_rate
-        )
-        employee_total = sum(
-            (line.employee_amount for line in lines), Decimal("0.00")
-        )
-        employer_total = sum(
-            (line.employer_amount for line in lines), Decimal("0.00")
-        )
+        common = period.common_contribution_base
+        professional = period.professional_contribution_base
+        lines = period.contributions
+        employee_total = period.employee_contributions
+        employer_total = period.employer_contributions
         cash_withholding = (cash_gross * withholding_rate / 100).quantize(CENT)
         withholding = cash_withholding
         net_before_insurance = gross - employee_total - withholding
@@ -211,8 +230,10 @@ def _ordinary_payroll(
             cash_withholding_amount=cash_withholding,
             net_before_insurance=net_before_insurance,
             estimated_annual_extra_amount=estimated_annual_extras,
-            extra_payment_accrual=accrual,
-            uncapped_contribution_base=uncapped,
+            annual_salary_days=360,
+            contribution_days=30,
+            extra_payment_accrual=period.extra_payment_accrual,
+            uncapped_contribution_base=period.uncapped_contribution_base,
             common_contribution_base=common,
             professional_contribution_base=professional,
             contributions=lines,
@@ -323,3 +344,79 @@ def calculate_ordinary_payroll_with_insurance_deductions_2026(
         occupational_risk_rate,
         rounding,
     )
+
+
+def calculate_period_contributions_2026(
+    gross_amount: Decimal,
+    estimated_annual_extras: Decimal,
+    annual_salary_days: int,
+    contribution_days: int,
+    contribution_group: int,
+    occupational_risk_rate: Decimal,
+    rounding: str,
+) -> PeriodContributions:
+    """Contribute actual period earnings plus an estimated daily extra rate.
+
+    Extra earnings are normalized over salary days in the covered year;
+    contribution days use TGSS's natural-day rule for incomplete months.
+    This excludes incidents, settlements, arrears and retroactive adjustments.
+    """
+    with localcontext(_calculation_context(rounding)):
+        for field, value in (
+            ("gross_amount", gross_amount),
+            ("estimated_annual_extras", estimated_annual_extras),
+        ):
+            if (
+                not isinstance(value, Decimal)
+                or not value.is_finite()
+                or not 0 <= value <= MAX_INPUT_AMOUNT
+                or value != value.quantize(CENT)
+            ):
+                raise InvalidPayrollInput(
+                    field,
+                    "Indica un Decimal monetario finito, no negativo y sin fracciones de céntimo.",
+                )
+        for field, value, maximum in (
+            ("annual_salary_days", annual_salary_days, 360),
+            ("contribution_days", contribution_days, 30),
+            ("contribution_group", contribution_group, 7),
+        ):
+            if type(value) is not int or not 1 <= value <= maximum:
+                raise InvalidPayrollInput(
+                    field, f"Indica un entero entre 1 y {maximum}."
+                )
+        _validate_rate(occupational_risk_rate, "occupational_risk_rate")
+        accrual = (
+            estimated_annual_extras / annual_salary_days * contribution_days
+        ).quantize(CENT)
+        uncapped = gross_amount + accrual
+        maximum = (rules.MAXIMUM_BASE * contribution_days / 30).quantize(CENT)
+        minimum = (
+            rules.MONTHLY_MINIMUM_BASES[contribution_group - 1]
+            * contribution_days
+            / 30
+        ).quantize(CENT)
+        professional_minimum = (
+            rules.MINIMUM_PROFESSIONAL_BASE * contribution_days / 30
+        ).quantize(CENT)
+        common = min(maximum, max(minimum, uncapped))
+        professional = min(maximum, max(professional_minimum, uncapped))
+        lines = _contributions(
+            common,
+            professional,
+            uncapped,
+            occupational_risk_rate,
+            contribution_days,
+        )
+        return PeriodContributions(
+            estimated_annual_extras,
+            annual_salary_days,
+            contribution_days,
+            accrual,
+            uncapped,
+            common,
+            professional,
+            lines,
+            sum((line.employee_amount for line in lines), Decimal("0.00")),
+            sum((line.employer_amount for line in lines), Decimal("0.00")),
+        )

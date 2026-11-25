@@ -162,3 +162,31 @@ def standard_month_salary_days(
     last_day = end - timedelta(days=1)
     end_day = 30 if end == month_end else min(last_day.day, 30)
     return max(0, end_day - min(start.day, 30) + 1)
+
+
+def monthly_contribution_days(
+    employment_start: date, employment_end: date | None, month_start: date
+) -> int:
+    """Use 30 for a full monthly contribution period, actual days otherwise.
+
+    TGSS monthly base adjustment rules (December 2024), sections 1 and 6.
+    Only the ordinary full-time monthly profile without incidents is covered.
+    """
+    salary_days = standard_month_salary_days(
+        employment_start, employment_end, month_start
+    )
+    if salary_days == 0:
+        return 0
+    month_end = date(
+        month_start.year + (month_start.month == 12),
+        month_start.month % 12 + 1,
+        1,
+    )
+    if employment_start <= month_start and (
+        employment_end is None or employment_end >= month_end
+    ):
+        return 30
+    return (
+        min(employment_end or month_end, month_end)
+        - max(employment_start, month_start)
+    ).days

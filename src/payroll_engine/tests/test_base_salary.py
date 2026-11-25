@@ -13,6 +13,7 @@ from payroll_engine.base_salary import (
     InvalidBaseSalaryInput,
     base_salary_from_annual,
     base_salary_from_monthly,
+    monthly_contribution_days,
     prorate_monthly_salary,
     standard_month_salary_days,
 )
@@ -216,3 +217,19 @@ class StandardSalaryMonthTests(TestCase):
             with self.subTest(start=start, end=end, month=month):
                 with self.assertRaises(InvalidBaseSalaryInput):
                     standard_month_salary_days(start, end, month)
+
+
+class MonthlyContributionDayTests(TestCase):
+    def test_full_month_is_thirty_but_incomplete_month_uses_actual_dates(self):
+        for start, end, month, expected in (
+            (date(2026, 2, 1), None, date(2026, 2, 1), 30),
+            (date(2026, 2, 15), None, date(2026, 2, 1), 14),
+            (date(2028, 2, 15), None, date(2028, 2, 1), 15),
+            (date(2026, 1, 15), None, date(2026, 1, 1), 17),
+            (date(2026, 1, 1), date(2026, 2, 16), date(2026, 2, 1), 15),
+            (date(2026, 1, 1), date(2026, 2, 1), date(2026, 2, 1), 0),
+        ):
+            with self.subTest(start=start, end=end, month=month):
+                self.assertEqual(
+                    monthly_contribution_days(start, end, month), expected
+                )
