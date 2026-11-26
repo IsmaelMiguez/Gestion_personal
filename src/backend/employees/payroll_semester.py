@@ -8,7 +8,6 @@ from payroll_engine.base_salary import (
     _calculation_context,
     base_salary_from_annual,
     base_salary_from_monthly,
-    standard_month_salary_days,
 )
 from payroll_engine.extra_payments import (
     InvalidExtraPaymentInput,
@@ -23,7 +22,7 @@ from payroll_engine.seniority import (
     calculate_monthly_seniority,
 )
 
-from .payroll_scope import monthly_contract_issues
+from .payroll_scope import condition_segments, monthly_contract_issues
 
 
 def _payment_cash(relationship, conditions, result, rounding):
@@ -76,38 +75,31 @@ def _payment_cash(relationship, conditions, result, rounding):
     return payment, ""
 
 
-def _month_input(relationship, conditions, month, rounding):
-    end = date(month.year + (month.month == 12), month.month % 12 + 1, 1)
-    salary_days = standard_month_salary_days(
-        relationship.start_date, relationship.end_date, month
-    )
-    if salary_days == 0:
+def _month_inputs(relationship, conditions, month, rounding):
+    segments = condition_segments(relationship, conditions, month)
+    if not segments:
         modalities = {condition.payments_per_year for condition in conditions}
         if len(modalities) != 1 or not modalities <= {12, 14}:
             raise InvalidExtraPaymentInput(
                 "payments_per_year",
                 "No hay una modalidad única de 12 o 14 pagas para identificar los meses sin relación laboral.",
             )
-        return ExtraAccrualMonth(
-            month, Decimal(0), Decimal(0), modalities.pop(), 0
+        return (
+            (
+                ExtraAccrualMonth(
+                    month, Decimal(0), Decimal(0), modalities.pop(), 0
+                ),
+                None,
+            ),
         )
-    active_start = max(month, relationship.start_date)
-    active_end = min(end, relationship.end_date or end)
-    covering = [
-        condition
-        for condition in conditions
-        if condition.valid_from <= active_start
-        and (
-            condition.valid_until is None
-            or condition.valid_until >= active_end
-        )
-    ]
-    if len(covering) != 1:
-        raise InvalidExtraPaymentInput(
-            "conditions",
-            "Falta un único periodo de condiciones que cubra todo el intervalo activo del mes; puede haber huecos o cambios dentro del mes.",
-        )
-    condition = covering[0]
+    return tuple(
+        (_segment_input(relationship, segment, month, rounding), segment)
+        for segment in segments
+    )
+
+
+def _segment_input(relationship, segment, month, rounding):
+    condition = segment["condition"]
     calculator = {
         "ANNUAL": base_salary_from_annual,
         "MONTHLY": base_salary_from_monthly,
@@ -143,7 +135,7 @@ def _month_input(relationship, conditions, month, rounding):
         salary.ordinary_payment_amount,
         seniority.amount,
         condition.payments_per_year,
-        salary_days,
+        segment["salary_days"],
     )
 
 
@@ -155,7 +147,7 @@ def semester_extra(relationship, year, first_month, rounding, as_of_date):
     for number in range(first_month, first_month + 6):
         month = date(year, number, 1)
         try:
-            item = _month_input(relationship, conditions, month, rounding)
+            items = _month_inputs(relationship, conditions, month, rounding)
         except (
             InvalidExtraPaymentInput,
             InvalidBaseSalaryInput,
@@ -165,16 +157,19 @@ def semester_extra(relationship, year, first_month, rounding, as_of_date):
             issues.append(f"{month:%m/%Y}: {reason}")
             rows.append({"month": month, "issue": reason})
         else:
-            inputs.append(item)
-            rows.append(
-                {
-                    "month": month,
-                    "base_salary": item.base_salary,
-                    "seniority": item.seniority,
-                    "payments": item.payments_per_year,
-                    "salary_days": item.salary_days,
-                }
-            )
+            for item, segment in items:
+                inputs.append(item)
+                rows.append(
+                    {
+                        "month": month,
+                        "base_salary": item.base_salary,
+                        "seniority": item.seniority,
+                        "payments": item.payments_per_year,
+                        "salary_days": item.salary_days,
+                        "start": segment["start"] if segment else None,
+                        "last_day": segment["last_day"] if segment else None,
+                    }
+                )
     result = None
     if not issues:
         try:

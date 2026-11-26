@@ -287,6 +287,7 @@ class PayrollReportTests(TestCase):
                 annual_extra_estimate(
                     self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
                 ),
+                None,
             )["cells"]
         }
         self.assertTrue(cells["I"]["available"])
@@ -302,6 +303,7 @@ class PayrollReportTests(TestCase):
                 annual_extra_estimate(
                     self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
                 ),
+                None,
             )["cells"]
         }
         self.assertEqual(cells["I"]["value"], Decimal("0.00"))
@@ -351,6 +353,7 @@ class PayrollReportTests(TestCase):
                 annual_extra_estimate(
                     self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
                 ),
+                None,
             )["cells"]
         }
         self.assertTrue(cells["G"]["available"])
@@ -368,6 +371,7 @@ class PayrollReportTests(TestCase):
                 annual_extra_estimate(
                     self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
                 ),
+                None,
             )["cells"]
         }
         for code in ("G", "P"):
@@ -468,7 +472,7 @@ class PayrollReportTests(TestCase):
         self.assertContains(response, "Días / 30")
         self.assertContains(response, "÷ 180")
 
-    def test_partial_insurance_does_not_block_contributions_but_transfer_waits_for_policy(
+    def test_partial_insurance_uses_salary_days_without_changing_contributions(
         self,
     ):
         self.relationship.start_date = date(2026, 2, 15)
@@ -486,7 +490,9 @@ class PayrollReportTests(TestCase):
         ]
         for code in ("AC", "BV", "BY", "BZ", "CB"):
             self.assertTrue(february[code]["available"])
-        self.assertFalse(february["CA"]["available"])
+        self.assertTrue(february["CA"]["available"])
+        self.assertEqual(february["Q"]["value"], Decimal("53.33"))
+        self.assertEqual(february["CA"]["value"], Decimal("773.91"))
         self.assertTrue(march["CA"]["available"])
         self.assertEqual(march["CA"]["value"], Decimal("1448.33"))
         detail = self.client.post(
@@ -510,6 +516,223 @@ class PayrollReportTests(TestCase):
         self.assertTrue(cells["BV"]["available"])
         self.assertFalse(cells["BZ"]["available"])
         self.assertFalse(cells["CA"]["available"])
+
+    def test_partial_premiums_round_individually_and_transfer_uses_displayed_deductions(
+        self,
+    ):
+        self.relationship.end_date = date(2026, 2, 16)
+        self.relationship.save()
+        self.condition.valid_until = date(2026, 2, 16)
+        for name in self.condition.money_fields[1:5]:
+            setattr(self.condition, name, 1)
+        self.condition.save()
+        response = self.client.post(self.url, {**self.values, "months": ["2"]})
+        cells = {
+            cell["code"]: cell for cell in response.context["rows"][0]["cells"]
+        }
+        for code in ("Q", "R", "S", "T"):
+            self.assertEqual(cells[code]["value"], Decimal("0.01"))
+        self.assertEqual(
+            cells["CA"]["value"],
+            cells["W"]["value"]
+            - cells["BV"]["value"]
+            - cells["BZ"]["value"]
+            - Decimal("0.04"),
+        )
+        self.assertEqual(cells["CG"]["value"], cells["CA"]["value"])
+        detail = self.client.post(
+            self.url,
+            {**self.values, "months": ["2"], "cell": cells["Q"]["key"]},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertContains(detail, "0.01 ÷ 30 × 15 días")
+        self.assertContains(detail, "cada seguro por separado")
+        self.condition.refresh_from_db()
+        self.assertEqual(self.condition.employee_insurance_exempt_cents, 1)
+        self.condition.family_insurance_taxable_cents = None
+        self.condition.save()
+        response = self.client.post(self.url, {**self.values, "months": ["2"]})
+        cells = {
+            cell["code"]: cell for cell in response.context["rows"][0]["cells"]
+        }
+        self.assertFalse(cells["T"]["available"])
+        self.assertFalse(cells["CA"]["available"])
+
+    def test_part_time_hours_are_entered_per_period_and_survive_detail_without_persistence(
+        self,
+    ):
+        self.condition.working_time_percentage = 50
+        self.condition.salary_period = "MONTHLY"
+        self.condition.salary_amount_cents = 50000
+        self.condition.payments_per_year = 12
+        self.condition.contribution_group = 1
+        self.condition.save()
+        response = self.client.post(self.url, self.values)
+        cells = {
+            cell["code"]: cell for cell in response.context["rows"][0]["cells"]
+        }
+        self.assertEqual(cells["O"]["value"], Decimal(500))
+        self.assertFalse(cells["AC"]["available"])
+        self.assertContains(
+            response, "Introduce las horas de este trabajador y mes"
+        )
+        payload = {
+            **self.values,
+            f"hours-{self.relationship.pk}-2026-1-worked_hours": "80",
+            f"hours-{self.relationship.pk}-2026-2-worked_hours": "60",
+        }
+        response = self.client.post(self.url, payload)
+        january, february = response.context["rows"]
+        jan = {cell["code"]: cell for cell in january["cells"]}
+        feb = {cell["code"]: cell for cell in february["cells"]}
+        self.assertEqual(jan["AC"]["value"], Decimal("958.40"))
+        self.assertEqual(feb["AC"]["value"], Decimal("718.80"))
+        self.assertTrue(jan["CA"]["available"])
+        self.assertEqual(january["hours_form"]["worked_hours"].value(), "80")
+        self.assertContains(response, "data-payroll-hours")
+        self.assertContains(response, 'form="report-filters"')
+        detail = self.client.post(
+            self.url,
+            {**payload, "cell": jan["AC"]["key"]},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertContains(detail, "Horas ordinarias introducidas")
+        self.assertContains(detail, "958,40")
+        self.assertNotContains(detail, "<!doctype html>")
+        self.condition.refresh_from_db()
+        self.assertEqual(self.condition.salary_amount_cents, 50000)
+        self.assertEqual(self.condition.working_time_percentage, Decimal(50))
+        self.assertEqual(EmploymentCondition.objects.count(), 1)
+        for invalid in ("", "0", "-1", "1.001", "NaN", "abc", "700"):
+            with self.subTest(hours=invalid):
+                result = self.client.post(
+                    self.url,
+                    {
+                        **payload,
+                        "months": ["2"],
+                        f"hours-{self.relationship.pk}-2026-2-worked_hours": invalid,
+                    },
+                )
+                row = result.context["rows"][0]
+                self.assertTrue(row["hours_form"].errors)
+                self.assertFalse(
+                    next(
+                        cell for cell in row["cells"] if cell["code"] == "CA"
+                    )["available"]
+                )
+
+    def test_part_time_february_hire_keeps_salary_and_insurance_proration_separate_from_hours(
+        self,
+    ):
+        self.relationship.start_date = date(2026, 2, 15)
+        self.relationship.seniority_date = date(2026, 2, 15)
+        self.relationship.save()
+        self.condition.valid_from = date(2026, 2, 15)
+        self.condition.working_time_percentage = 50
+        self.condition.salary_period = "MONTHLY"
+        self.condition.salary_amount_cents = 100000
+        self.condition.employee_insurance_exempt_cents = 10000
+        self.condition.save()
+        response = self.client.post(
+            self.url,
+            {
+                **self.values,
+                "months": ["2"],
+                f"hours-{self.relationship.pk}-2026-2-worked_hours": "40",
+            },
+        )
+        cells = {
+            cell["code"]: cell for cell in response.context["rows"][0]["cells"]
+        }
+        for code, expected in (
+            ("O", "533.33"),
+            ("Q", "53.33"),
+            ("AC", "611.11"),
+            ("BV", "39.72"),
+            ("CA", "360.28"),
+        ):
+            with self.subTest(code=code):
+                self.assertEqual(cells[code]["value"], Decimal(expected))
+        self.assertEqual(
+            cells["AC"]["contribution_period"]["worked_hours"], Decimal(40)
+        )
+        self.assertEqual(
+            cells["AC"]["contribution_period"]["minimum_common_base"],
+            Decimal("343.20"),
+        )
+        self.assertEqual(
+            response.context["semester_extras"][0]["payment"].net_amount,
+            Decimal("642.23"),
+        )
+
+    def test_manual_hours_are_isolated_between_workers_and_stale_values_are_ignored(
+        self,
+    ):
+        self.condition.working_time_percentage = 50
+        self.condition.salary_period = "MONTHLY"
+        self.condition.salary_amount_cents = 50000
+        self.condition.payments_per_year = 12
+        self.condition.contribution_group = 1
+        self.condition.save()
+        other = Employee.objects.create(
+            internal_code="PART-OTHER",
+            first_name="Sam",
+            last_name="Other",
+            birth_date=date(1991, 1, 1),
+        )
+        relationship = EmploymentRelationship.objects.create(
+            employee=other,
+            company=self.company,
+            start_date=date(2026, 1, 1),
+            seniority_date=date(2026, 1, 1),
+        )
+        values = {
+            field.name: getattr(self.condition, field.name)
+            for field in self.condition._meta.concrete_fields
+            if not field.primary_key and not field.is_relation
+        }
+        EmploymentCondition.objects.create(
+            employment_relationship=relationship, **values
+        )
+        payload = {
+            **self.values,
+            "months": ["1"],
+            "employees": [str(self.employee.pk), str(other.pk)],
+            f"hours-{self.relationship.pk}-2026-1-worked_hours": "80",
+            f"hours-{relationship.pk}-2026-1-worked_hours": "40",
+            "hours-999999-2026-1-worked_hours": "744",
+        }
+        response = self.client.post(self.url, payload)
+        rows = {
+            row["relationship_id"]: row for row in response.context["rows"]
+        }
+        first = {
+            cell["code"]: cell for cell in rows[self.relationship.pk]["cells"]
+        }
+        second = {
+            cell["code"]: cell for cell in rows[relationship.pk]["cells"]
+        }
+        self.assertEqual(first["AC"]["value"], Decimal("958.40"))
+        self.assertEqual(second["AC"]["value"], Decimal(500))
+        self.assertEqual(
+            rows[relationship.pk]["hours_form"]["worked_hours"].value(), "40"
+        )
+        self.assertNotIn(
+            "required",
+            rows[relationship.pk]["hours_form"]["worked_hours"].as_widget(),
+        )
+        del payload[f"hours-{relationship.pk}-2026-1-worked_hours"]
+        response = self.client.post(self.url, payload)
+        row = next(
+            row
+            for row in response.context["rows"]
+            if row["relationship_id"] == relationship.pk
+        )
+        self.assertFalse(
+            next(cell for cell in row["cells"] if cell["code"] == "AC")[
+                "available"
+            ]
+        )
 
     def setUp(self):
         self.user = get_user_model().objects.create_user(
@@ -694,6 +917,7 @@ class PayrollReportTests(TestCase):
                         ROUND_HALF_UP,
                         date(2026, 11, 19),
                     ),
+                    None,
                 )
                 cells = {cell["code"]: cell for cell in row["cells"]}
                 self.assertFalse(cells["CA"]["available"])
@@ -710,6 +934,7 @@ class PayrollReportTests(TestCase):
             annual_extra_estimate(
                 self.relationship, 2027, ROUND_HALF_UP, date(2026, 11, 19)
             ),
+            None,
         )
         self.assertIn("ejercicio", " ".join(row["issues"]))
         self.condition.valid_until = date(2026, 1, 15)
@@ -722,6 +947,7 @@ class PayrollReportTests(TestCase):
             annual_extra_estimate(
                 self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
             ),
+            None,
         )
         self.assertFalse(
             next(cell for cell in row["cells"] if cell["code"] == "CA")[
@@ -810,6 +1036,7 @@ class PayrollReportTests(TestCase):
             annual_extra_estimate(
                 self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
             ),
+            None,
         )
         cells = {cell["code"]: cell for cell in row["cells"]}
         self.assertEqual(cells["O"]["value"], Decimal("2000.01"))
@@ -823,6 +1050,7 @@ class PayrollReportTests(TestCase):
             annual_extra_estimate(
                 self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
             ),
+            None,
         )
         self.assertFalse(
             next(cell for cell in row["cells"] if cell["code"] == "O")[
@@ -843,6 +1071,7 @@ class PayrollReportTests(TestCase):
             annual_extra_estimate(
                 self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
             ),
+            None,
         )
         cells = {cell["code"]: cell for cell in row["cells"]}
         self.assertTrue(cells["P"]["available"])
@@ -860,6 +1089,7 @@ class PayrollReportTests(TestCase):
             annual_extra_estimate(
                 self.relationship, 2026, ROUND_HALF_UP, date(2026, 11, 19)
             ),
+            None,
         )
         self.assertIn("límite", " ".join(row["issues"]))
 

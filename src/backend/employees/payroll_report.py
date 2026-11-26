@@ -15,30 +15,23 @@ from payroll_engine.base_salary import (
 from payroll_engine.ordinary_payroll import (
     InvalidPayrollInput,
     calculate_ordinary_payroll_with_insurance_deductions_2026,
+    calculate_part_time_contributions_2026,
     calculate_period_contributions_2026,
 )
 
-from .payroll_columns import COLUMNS
 from .payroll_extras import extra_reference_cell
 from .payroll_report_values import (
+    pending_cell as _pending,
+)
+from .payroll_report_values import (
     period_result_cells,
+    report_result,
     result_cells,
     value_cell,
 )
 from .payroll_scope import monthly_contract_issues
+from .payroll_segments import segmented_report_row
 from .payroll_seniority import seniority_cells
-
-
-def _pending(code, reason):
-    return {
-        "code": code,
-        "label": dict(COLUMNS)[code],
-        "value": "Pendiente",
-        "formula": "No se ha ejecutado este cálculo.",
-        "operands": "",
-        "note": reason,
-        "available": False,
-    }
 
 
 def _scope_reasons(relationship, condition, start, end, year):
@@ -49,7 +42,7 @@ def _scope_reasons(relationship, condition, start, end, year):
         relationship.end_date and relationship.end_date < end
     ):
         reasons.append(
-            "Sueldo base, antigüedad, complemento fijo y devengo de extras prorrateados con mes estándar de 30 días cuando sus datos están informados. La nómina parcial completa se calcula por conceptos; el descuento de seguros requiere concretar la prima aplicable."
+            "Sueldo base, antigüedad, complemento fijo y devengo de extras prorrateados con mes estándar de 30 días cuando sus datos están informados. La nómina parcial completa se calcula por conceptos; los seguros se descuentan del líquido en proporción a los días salariales sobre 30."
         )
     if condition is None:
         reasons.append(
@@ -105,7 +98,9 @@ def _salary_cells(condition, salary_days, rounding):
     return {"O": cell}, salary, ""
 
 
-def report_row(relationship, year, month, rounding, extra_estimate):
+def report_row(
+    relationship, year, month, rounding, extra_estimate, worked_hours
+):
     with localcontext(Context(prec=28, rounding=rounding)):
         start = date(year, month, 1)
         end = date(year + (month == 12), month % 12 + 1, 1)
@@ -114,6 +109,19 @@ def report_row(relationship, year, month, rounding, extra_estimate):
         )
         active_start = max(start, relationship.start_date)
         active_end = min(end, relationship.end_date or end)
+        overlapping = [
+            condition
+            for condition in relationship.conditions.all()
+            if condition.valid_from < active_end
+            and (
+                condition.valid_until is None
+                or condition.valid_until > active_start
+            )
+        ]
+        if len(overlapping) > 1:
+            return segmented_report_row(
+                relationship, start, rounding, extra_estimate, worked_hours
+            )
         covering = [
             condition
             for condition in relationship.conditions.all()
@@ -139,6 +147,9 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                 str(value),
                 "No es un importe calculado.",
             )
+        requires_hours = (
+            condition is not None and condition.working_time_percentage < 100
+        )
         if condition:
             values["F"] = value_cell(
                 "F",
@@ -182,34 +193,20 @@ def report_row(relationship, year, month, rounding, extra_estimate):
             ):
                 amount = getattr(condition, name)
                 if amount is not None:
-                    if salary_days < 30 and code != "U" and amount != 0:
-                        values[code] = _pending(
-                            code,
-                            "Importe mensual registrado, pendiente de determinar su descuento en el periodo parcial; no se presupone el prorrateo de la prima del seguro.",
-                        )
-                        continue
+                    monthly_amount = Decimal(amount) / 100
                     values[code] = value_cell(
                         code,
-                        Decimal(amount) / 100,
-                        "Importe contractual registrado en céntimos ÷ 100",
-                        str(amount),
+                        prorate_monthly_salary(
+                            monthly_amount, salary_days, rounding
+                        ),
+                        "Importe mensual ÷ 30 × días salariales",
+                        f"{monthly_amount} ÷ 30 × {salary_days} días.",
                         (
                             "Complemento dinerario mensual en doce pagos. Se suma al bruto y cotiza/tributa; no entra en extras ni en la base de antigüedad."
                             if code == "U"
-                            else "Prima a cargo del trabajador que se descuenta del líquido después de SS e IRPF. La etiqueta histórica exento/sujeto no modifica la fiscalidad en este perfil."
+                            else "Prima a cargo del trabajador descontada del líquido después de SS e IRPF. Se prorratea por días salariales, también en febrero, y se redondea cada seguro por separado antes de sumarlos. La etiqueta histórica exento/sujeto no modifica la fiscalidad."
                         ),
                     )
-            if salary_days < 30 and "U" in values:
-                monthly_amount = values["U"]["value"]
-                values["U"] = value_cell(
-                    "U",
-                    prorate_monthly_salary(
-                        monthly_amount, salary_days, rounding
-                    ),
-                    "Complemento fijo mensual ÷ 30 × días salariales",
-                    f"{monthly_amount} ÷ 30 × {salary_days} días.",
-                    "Complemento dinerario en doce mensualidades; no entra en antigüedad ni extras.",
-                )
             if all(
                 code in values and values[code]["available"]
                 for code in ("O", "P", "U")
@@ -240,13 +237,17 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                 reasons.append(
                     "Cambio entre 12 y 14 pagas en el ejercicio: transición de cotización pendiente."
                 )
-            period_only = salary_days < 30 or (
-                condition.payments_per_year == 14
-                and extra_estimate["annual_salary_days"] != 360
+            period_only = (
+                requires_hours
+                or salary_days < 30
+                or (
+                    condition.payments_per_year == 14
+                    and extra_estimate["annual_salary_days"] != 360
+                )
             )
             if period_only:
                 reasons.append(
-                    "Cálculo por periodo de relación laboral. Cada concepto se publica cuando están disponibles sus datos; el líquido requiere conocer el descuento de seguros."
+                    "Cálculo por periodo de relación laboral. Cada concepto se publica cuando están disponibles sus datos; los seguros se prorratean con los días salariales sobre 30."
                 )
             if (
                 period_only
@@ -267,15 +268,27 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                     else 360
                 )
                 try:
-                    contributions = calculate_period_contributions_2026(
-                        values["W"]["value"],
-                        estimated_extras,
-                        annual_days,
-                        days,
-                        condition.contribution_group,
-                        condition.occupational_risk_rate,
-                        rounding,
-                    )
+                    if requires_hours:
+                        contributions = calculate_part_time_contributions_2026(
+                            values["W"]["value"],
+                            estimated_extras,
+                            annual_days,
+                            days,
+                            condition.contribution_group,
+                            condition.occupational_risk_rate,
+                            worked_hours,
+                            rounding,
+                        )
+                    else:
+                        contributions = calculate_period_contributions_2026(
+                            values["W"]["value"],
+                            estimated_extras,
+                            annual_days,
+                            days,
+                            condition.contribution_group,
+                            condition.occupational_risk_rate,
+                            rounding,
+                        )
                 except InvalidPayrollInput as error:
                     reasons.append(str(error))
                 else:
@@ -283,7 +296,12 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                         contributions,
                         condition,
                         values["W"]["value"],
-                        salary_days,
+                        tuple(
+                            values[code]["value"]
+                            if code in values and values[code]["available"]
+                            else None
+                            for code in ("Q", "R", "S", "T")
+                        ),
                     )
                     for cell in period_cells.values():
                         cell["contribution_period"] = {
@@ -292,6 +310,11 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                             "annual_salary_days": annual_days,
                             "estimated_extras": estimated_extras,
                             "accrual": contributions.extra_payment_accrual,
+                            "worked_hours": worked_hours
+                            if requires_hours
+                            else None,
+                            "minimum_common_base": contributions.minimum_common_base,
+                            "minimum_professional_base": contributions.minimum_professional_base,
                         }
                     values.update(period_cells)
                     if condition.payments_per_year == 14:
@@ -362,26 +385,15 @@ def report_row(relationship, year, month, rounding, extra_estimate):
                     f"{gross} + {extra_cell['value']}",
                     "Equivalente de mes completo, no un importe devengado por días. La cotización utiliza X, calculada con la estimación anual; puede diferir si cambian las condiciones.",
                 )
-        pending_reason = (
-            " ".join(reasons)
-            or "Este concepto del Excel aún no está implementado o requiere reglas de incidencias, extras o INSS."
+        row = report_result(
+            relationship,
+            start,
+            values,
+            reasons,
+            salary_days,
+            requires_hours,
+            (),
         )
-        cells = [
-            values.get(code) or _pending(code, pending_reason)
-            for code, label in COLUMNS
-        ]
-        for cell in cells:
-            cell["key"] = f"{relationship.pk}:{year}:{month}:{cell['code']}"
+        for cell in row["cells"]:
             cell["rounding"] = rounding
-            cell["period"] = f"{month:02}/{year}"
-            cell["employee"] = str(relationship.employee)
-            cell["company"] = str(relationship.company)
-        return {
-            "company": relationship.company,
-            "employee": relationship.employee,
-            "relationship_id": relationship.pk,
-            "period": f"{month:02}/{year}",
-            "salary_days": salary_days,
-            "cells": cells,
-            "issues": reasons,
-        }
+        return row

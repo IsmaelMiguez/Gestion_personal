@@ -1,6 +1,8 @@
 from datetime import date
+from decimal import Decimal
 
 from django import forms
+from django.core.validators import MaxValueValidator
 
 from .forms import BootstrapFormMixin
 from .models import Company, Employee
@@ -33,7 +35,7 @@ class PayrollReportForm(BootstrapFormMixin, forms.Form):
     rounding = OrdinaryPayrollForm.base_fields["rounding"]
     base_only = forms.BooleanField(
         label="Confirmo que los periodos y el ejercicio anual usado para estimar las extras no tienen incidencias, bonus, "
-        "pluriempleo, bonificaciones ni cotizaciones especiales.",
+        "pluriempleo, bonificaciones, horas complementarias/extraordinarias, trabajo concentrado ni cotizaciones especiales.",
         help_text="Los conceptos adicionales registrados se comprobarán igualmente.",
     )
 
@@ -98,3 +100,32 @@ class PayrollReportForm(BootstrapFormMixin, forms.Form):
                 "Selecciona como máximo 240 combinaciones por consulta."
             )
         return values
+
+
+class PayrollHoursForm(BootstrapFormMixin, forms.Form):
+    use_required_attribute = False
+
+    worked_hours = forms.DecimalField(
+        label="Horas ordinarias trabajadas",
+        min_value=Decimal("0.01"),
+        decimal_places=2,
+        max_digits=5,
+        error_messages={
+            "required": "Introduce las horas de este trabajador y mes."
+        },
+        widget=forms.NumberInput(
+            attrs={
+                "form": "report-filters",
+                "data-payroll-hours": "",
+                "aria-label": "Horas ordinarias trabajadas",
+            }
+        ),
+    )
+
+    def __init__(self, maximum_hours, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["worked_hours"].max_value = maximum_hours
+        self.fields["worked_hours"].validators.append(
+            MaxValueValidator(maximum_hours)
+        )
+        self.fields["worked_hours"].widget.attrs["max"] = maximum_hours

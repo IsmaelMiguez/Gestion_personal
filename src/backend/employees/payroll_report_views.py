@@ -13,7 +13,7 @@ from frontend.pages.access import staff_required
 from .models import EmploymentCondition, EmploymentRelationship
 from .payroll_columns import COLUMNS, column_group
 from .payroll_report import report_row
-from .payroll_report_forms import PayrollReportForm
+from .payroll_report_forms import PayrollHoursForm, PayrollReportForm
 from .payroll_semester import annual_extra_estimate
 
 
@@ -90,9 +90,35 @@ def payroll_report(request):
                     semesters[first] for first in sorted(first_months)
                 )
                 for month in sorted(data["months"]):
-                    row = report_row(
-                        relationship, year, month, data["rounding"], estimate
+                    start = date(year, month, 1)
+                    end = date(year + (month == 12), month % 12 + 1, 1)
+                    active_days = max(
+                        0,
+                        (
+                            min(end, relationship.end_date or end)
+                            - max(start, relationship.start_date)
+                        ).days,
                     )
+                    hours_form = PayrollHoursForm(
+                        active_days * 24,
+                        data=request.POST,
+                        prefix=f"hours-{relationship.pk}-{year}-{month}",
+                    )
+                    hours = (
+                        hours_form.cleaned_data["worked_hours"]
+                        if hours_form.is_valid()
+                        else None
+                    )
+                    row = report_row(
+                        relationship,
+                        year,
+                        month,
+                        data["rounding"],
+                        estimate,
+                        hours,
+                    )
+                    if row["requires_hours"]:
+                        row["hours_form"] = hours_form
                     row["cells"] = [
                         cell
                         for cell in row["cells"]

@@ -1,4 +1,4 @@
-"""Ordinary payment: full month, full time, indefinite contract.
+"""Ordinary payments and period contributions for indefinite contracts.
 
 Monthly contribution groups 1–7 only; no special systems, rebates or
 additional retirement contributions. Estimated annual extras contribute
@@ -43,6 +43,8 @@ class PeriodContributions:
     uncapped_contribution_base: Decimal
     common_contribution_base: Decimal
     professional_contribution_base: Decimal
+    minimum_common_base: Decimal
+    minimum_professional_base: Decimal
     contributions: tuple[Contribution, ...]
     employee_contributions: Decimal
     employer_contributions: Decimal
@@ -68,6 +70,8 @@ class OrdinaryPayroll:
     uncapped_contribution_base: Decimal
     common_contribution_base: Decimal
     professional_contribution_base: Decimal
+    minimum_common_base: Decimal
+    minimum_professional_base: Decimal
     contributions: tuple[Contribution, ...]
     employee_contributions: Decimal
     employer_contributions: Decimal
@@ -75,6 +79,19 @@ class OrdinaryPayroll:
     withholding_amount: Decimal
     net_amount: Decimal
     employer_cash_cost: Decimal
+
+
+def _validate_money_amount(value, field):
+    if (
+        not isinstance(value, Decimal)
+        or not value.is_finite()
+        or not 0 <= value <= MAX_INPUT_AMOUNT
+        or value != value.quantize(CENT)
+    ):
+        raise InvalidPayrollInput(
+            field,
+            "Indica un Decimal monetario finito, no negativo y sin fracciones de céntimo dentro del límite admitido.",
+        )
 
 
 def _validate_rate(value: Decimal, field: str) -> None:
@@ -236,6 +253,8 @@ def _ordinary_payroll(
             uncapped_contribution_base=period.uncapped_contribution_base,
             common_contribution_base=common,
             professional_contribution_base=professional,
+            minimum_common_base=period.minimum_common_base,
+            minimum_professional_base=period.minimum_professional_base,
             contributions=lines,
             employee_contributions=employee_total,
             employer_contributions=employer_total,
@@ -346,6 +365,70 @@ def calculate_ordinary_payroll_with_insurance_deductions_2026(
     )
 
 
+def _validate_contribution_inputs(
+    gross_amount,
+    estimated_annual_extras,
+    annual_salary_days,
+    contribution_days,
+    contribution_group,
+    occupational_risk_rate,
+):
+    for field, value in (
+        ("gross_amount", gross_amount),
+        ("estimated_annual_extras", estimated_annual_extras),
+    ):
+        _validate_money_amount(value, field)
+    for field, value, maximum in (
+        ("annual_salary_days", annual_salary_days, 360),
+        ("contribution_days", contribution_days, 30),
+        ("contribution_group", contribution_group, 7),
+    ):
+        if type(value) is not int or not 1 <= value <= maximum:
+            raise InvalidPayrollInput(
+                field, f"Indica un entero entre 1 y {maximum}."
+            )
+    _validate_rate(occupational_risk_rate, "occupational_risk_rate")
+
+
+def _period_contributions(
+    gross_amount,
+    estimated_annual_extras,
+    annual_salary_days,
+    contribution_days,
+    minimum,
+    professional_minimum,
+    occupational_risk_rate,
+):
+    accrual = (
+        estimated_annual_extras / annual_salary_days * contribution_days
+    ).quantize(CENT)
+    uncapped = gross_amount + accrual
+    maximum = (rules.MAXIMUM_BASE * contribution_days / 30).quantize(CENT)
+    common = min(maximum, max(minimum, uncapped))
+    professional = min(maximum, max(professional_minimum, uncapped))
+    lines = _contributions(
+        common,
+        professional,
+        uncapped,
+        occupational_risk_rate,
+        contribution_days,
+    )
+    return PeriodContributions(
+        estimated_annual_extras,
+        annual_salary_days,
+        contribution_days,
+        accrual,
+        uncapped,
+        common,
+        professional,
+        minimum,
+        professional_minimum,
+        lines,
+        sum((line.employee_amount for line in lines), Decimal("0.00")),
+        sum((line.employer_amount for line in lines), Decimal("0.00")),
+    )
+
+
 def calculate_period_contributions_2026(
     gross_amount: Decimal,
     estimated_annual_extras: Decimal,
@@ -355,42 +438,16 @@ def calculate_period_contributions_2026(
     occupational_risk_rate: Decimal,
     rounding: str,
 ) -> PeriodContributions:
-    """Contribute actual period earnings plus an estimated daily extra rate.
-
-    Extra earnings are normalized over salary days in the covered year;
-    contribution days use TGSS's natural-day rule for incomplete months.
-    This excludes incidents, settlements, arrears and retroactive adjustments.
-    """
+    """Contribute full-time period earnings and normalize the extra estimate."""
     with localcontext(_calculation_context(rounding)):
-        for field, value in (
-            ("gross_amount", gross_amount),
-            ("estimated_annual_extras", estimated_annual_extras),
-        ):
-            if (
-                not isinstance(value, Decimal)
-                or not value.is_finite()
-                or not 0 <= value <= MAX_INPUT_AMOUNT
-                or value != value.quantize(CENT)
-            ):
-                raise InvalidPayrollInput(
-                    field,
-                    "Indica un Decimal monetario finito, no negativo y sin fracciones de céntimo.",
-                )
-        for field, value, maximum in (
-            ("annual_salary_days", annual_salary_days, 360),
-            ("contribution_days", contribution_days, 30),
-            ("contribution_group", contribution_group, 7),
-        ):
-            if type(value) is not int or not 1 <= value <= maximum:
-                raise InvalidPayrollInput(
-                    field, f"Indica un entero entre 1 y {maximum}."
-                )
-        _validate_rate(occupational_risk_rate, "occupational_risk_rate")
-        accrual = (
-            estimated_annual_extras / annual_salary_days * contribution_days
-        ).quantize(CENT)
-        uncapped = gross_amount + accrual
-        maximum = (rules.MAXIMUM_BASE * contribution_days / 30).quantize(CENT)
+        _validate_contribution_inputs(
+            gross_amount,
+            estimated_annual_extras,
+            annual_salary_days,
+            contribution_days,
+            contribution_group,
+            occupational_risk_rate,
+        )
         minimum = (
             rules.MONTHLY_MINIMUM_BASES[contribution_group - 1]
             * contribution_days
@@ -399,24 +456,137 @@ def calculate_period_contributions_2026(
         professional_minimum = (
             rules.MINIMUM_PROFESSIONAL_BASE * contribution_days / 30
         ).quantize(CENT)
-        common = min(maximum, max(minimum, uncapped))
-        professional = min(maximum, max(professional_minimum, uncapped))
-        lines = _contributions(
-            common,
-            professional,
-            uncapped,
-            occupational_risk_rate,
-            contribution_days,
-        )
-        return PeriodContributions(
+        return _period_contributions(
+            gross_amount,
             estimated_annual_extras,
             annual_salary_days,
             contribution_days,
-            accrual,
-            uncapped,
-            common,
-            professional,
-            lines,
-            sum((line.employee_amount for line in lines), Decimal("0.00")),
-            sum((line.employer_amount for line in lines), Decimal("0.00")),
+            minimum,
+            professional_minimum,
+            occupational_risk_rate,
+        )
+
+
+def calculate_part_time_contributions_2026(
+    gross_amount: Decimal,
+    estimated_annual_extras: Decimal,
+    annual_salary_days: int,
+    contribution_days: int,
+    contribution_group: int,
+    occupational_risk_rate: Decimal,
+    worked_hours: Decimal,
+    rounding: str,
+) -> PeriodContributions:
+    """Apply actual-hour minima, without reducing salary or maximum by FTE.
+
+    Orden PJC/297/2026, articles 38–39. Ordinary indefinite contracts,
+    monthly groups 1–7, without incidents or additional/overtime hours.
+    """
+    with localcontext(_calculation_context(rounding)):
+        _validate_contribution_inputs(
+            gross_amount,
+            estimated_annual_extras,
+            annual_salary_days,
+            contribution_days,
+            contribution_group,
+            occupational_risk_rate,
+        )
+        if (
+            not isinstance(worked_hours, Decimal)
+            or not worked_hours.is_finite()
+            or not 0 < worked_hours <= 744
+            or worked_hours != worked_hours.quantize(CENT)
+        ):
+            raise InvalidPayrollInput(
+                "worked_hours",
+                "Introduce las horas ordinarias realmente trabajadas en este mes (Decimal mayor que 0, hasta 744 y con dos decimales como máximo).",
+            )
+        minimum = (
+            rules.HOURLY_MINIMUM_BASES[contribution_group - 1] * worked_hours
+        ).quantize(CENT)
+        professional_minimum = (
+            rules.MINIMUM_PROFESSIONAL_HOURLY_BASE * worked_hours
+        ).quantize(CENT)
+        return _period_contributions(
+            gross_amount,
+            estimated_annual_extras,
+            annual_salary_days,
+            contribution_days,
+            minimum,
+            professional_minimum,
+            occupational_risk_rate,
+        )
+
+
+def calculate_condition_change_contributions_2026(
+    segments: tuple[tuple[Decimal, int], ...],
+    estimated_annual_extras: Decimal,
+    annual_salary_days: int,
+    contribution_group: int,
+    occupational_risk_rate: Decimal,
+    rounding: str,
+) -> PeriodContributions:
+    """Enforce each full-time segment's floor, with one monthly maximum.
+
+    Same contribution group and risk rate throughout, without incidents.
+    Solidarity still uses actual uncapped remuneration, not minimum uplift.
+    """
+    with localcontext(_calculation_context(rounding)):
+        if not isinstance(segments, tuple) or len(segments) < 2:
+            raise InvalidPayrollInput(
+                "segments",
+                "Indica al menos dos tramos de devengo y días cotizados.",
+            )
+        for index, segment in enumerate(segments):
+            if not isinstance(segment, tuple) or len(segment) != 2:
+                raise InvalidPayrollInput(
+                    "segments",
+                    "Cada tramo debe contener importe y días cotizados.",
+                )
+            gross, days = segment
+            if type(days) is not int or not 0 <= days <= 30:
+                raise InvalidPayrollInput(
+                    "segments", "Días cotizados de tramo inválidos."
+                )
+            _validate_money_amount(gross, f"segments[{index}].gross_amount")
+            if days == 0 and gross != 0:
+                raise InvalidPayrollInput(
+                    "segments",
+                    "Un tramo con cero días cotizados no puede tener bruto devengado.",
+                )
+        gross = sum((amount for amount, days in segments), Decimal(0))
+        days = sum(days for amount, days in segments)
+        _validate_contribution_inputs(
+            gross,
+            estimated_annual_extras,
+            annual_salary_days,
+            days,
+            contribution_group,
+            occupational_risk_rate,
+        )
+        extra_rate = estimated_annual_extras / annual_salary_days
+        minimum = sum(
+            max(
+                rules.MONTHLY_MINIMUM_BASES[contribution_group - 1]
+                * count
+                / 30,
+                amount + extra_rate * count,
+            )
+            for amount, count in segments
+        ).quantize(CENT)
+        professional_minimum = sum(
+            max(
+                rules.MINIMUM_PROFESSIONAL_BASE * count / 30,
+                amount + extra_rate * count,
+            )
+            for amount, count in segments
+        ).quantize(CENT)
+        return _period_contributions(
+            gross,
+            estimated_annual_extras,
+            annual_salary_days,
+            days,
+            minimum,
+            professional_minimum,
+            occupational_risk_rate,
         )

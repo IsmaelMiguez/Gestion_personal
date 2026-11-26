@@ -3,7 +3,9 @@ from unittest import TestCase
 
 from payroll_engine.ordinary_payroll import (
     InvalidPayrollInput,
+    calculate_condition_change_contributions_2026,
     calculate_ordinary_payroll_2026,
+    calculate_part_time_contributions_2026,
     calculate_period_contributions_2026,
 )
 
@@ -261,3 +263,136 @@ class PeriodContributionTests(TestCase):
                             **{**values, field: value}
                         )
                     self.assertEqual(raised.exception.field, field)
+
+
+class PartTimeContributionTests(TestCase):
+    def test_hourly_minima_use_real_hours_and_preserve_distinct_professional_base(
+        self,
+    ):
+        with localcontext() as context:
+            context.prec = 3
+            context.traps[Inexact] = True
+            result = calculate_part_time_contributions_2026(
+                Decimal(500),
+                Decimal(0),
+                360,
+                30,
+                1,
+                Decimal("1.50"),
+                Decimal(80),
+                ROUND_HALF_UP,
+            )
+            self.assertEqual(
+                result.common_contribution_base, Decimal("958.40")
+            )
+            self.assertEqual(
+                result.professional_contribution_base, Decimal("686.40")
+            )
+            self.assertEqual(result.employee_contributions, Decimal("57.81"))
+            self.assertEqual(context.prec, 3)
+        partial = calculate_part_time_contributions_2026(
+            Decimal("533.33"),
+            Decimal("1755.56"),
+            316,
+            14,
+            5,
+            Decimal("1.50"),
+            Decimal(40),
+            ROUND_HALF_UP,
+        )
+        self.assertEqual(partial.minimum_common_base, Decimal("343.20"))
+        self.assertEqual(partial.extra_payment_accrual, Decimal("77.78"))
+        self.assertEqual(partial.common_contribution_base, Decimal("611.11"))
+        self.assertEqual(partial.employee_contributions, Decimal("39.72"))
+
+    def test_maximum_and_solidarity_do_not_reduce_with_contract_percentage(
+        self,
+    ):
+        result = calculate_part_time_contributions_2026(
+            Decimal(6000),
+            Decimal(12000),
+            360,
+            30,
+            5,
+            Decimal(1),
+            Decimal(80),
+            ROUND_HALF_UP,
+        )
+        self.assertEqual(result.uncapped_contribution_base, Decimal(7000))
+        self.assertEqual(result.common_contribution_base, Decimal("5101.20"))
+        self.assertEqual(
+            tuple(line.base for line in result.contributions[-3:]),
+            (Decimal("510.12"), Decimal("1388.68"), Decimal(0)),
+        )
+
+    def test_hours_must_be_explicit_finite_positive_decimals(self):
+        for hours in (
+            None,
+            True,
+            80.0,
+            "80",
+            Decimal("NaN"),
+            Decimal("Infinity"),
+            Decimal(0),
+            Decimal(-1),
+            Decimal(745),
+            Decimal("1.001"),
+        ):
+            with self.subTest(hours=hours):
+                with self.assertRaises(InvalidPayrollInput) as raised:
+                    calculate_part_time_contributions_2026(
+                        Decimal(1000),
+                        Decimal(2000),
+                        360,
+                        30,
+                        5,
+                        Decimal(1),
+                        hours,
+                        ROUND_HALF_UP,
+                    )
+                self.assertEqual(raised.exception.field, "worked_hours")
+
+
+class ConditionChangeContributionTests(TestCase):
+    def test_segment_minimums_cannot_be_offset_by_higher_pay_in_the_next_segment(
+        self,
+    ):
+        result = calculate_condition_change_contributions_2026(
+            ((Decimal(50), 15), (Decimal(1500), 15)),
+            Decimal(0),
+            360,
+            5,
+            Decimal("1.50"),
+            ROUND_HALF_UP,
+        )
+        self.assertEqual(result.uncapped_contribution_base, Decimal(1550))
+        self.assertEqual(result.common_contribution_base, Decimal("2212.20"))
+        self.assertEqual(result.employee_contributions, Decimal("143.79"))
+        high = calculate_condition_change_contributions_2026(
+            ((Decimal(5000), 15), (Decimal(3000), 15)),
+            Decimal(0),
+            360,
+            5,
+            Decimal("1.50"),
+            ROUND_HALF_UP,
+        )
+        self.assertEqual(high.common_contribution_base, Decimal("5101.20"))
+        self.assertEqual(
+            tuple(line.base for line in high.contributions[-3:]),
+            (Decimal("510.12"), Decimal("2040.48"), Decimal("348.20")),
+        )
+
+    def test_invalid_segment_days_and_zero_day_earnings_are_rejected(self):
+        for segments in (
+            (),
+            ((Decimal(100), 15),),
+            ((Decimal(100), True), (Decimal(100), 15)),
+            ((Decimal(100), 0), (Decimal(100), 30)),
+            ((Decimal(100), 16), (Decimal(100), 16)),
+            ((None, 15), (Decimal(100), 15)),
+        ):
+            with self.subTest(segments=segments):
+                with self.assertRaises(InvalidPayrollInput):
+                    calculate_condition_change_contributions_2026(
+                        segments, Decimal(0), 360, 5, Decimal(1), ROUND_HALF_UP
+                    )

@@ -52,7 +52,7 @@ def calculate_semester_extra(
     transition rule and are rejected rather than partially accrued.
     """
     with localcontext(_calculation_context(rounding)):
-        if not isinstance(months, tuple) or len(months) != 6:
+        if not isinstance(months, tuple) or len(months) < 6:
             raise InvalidExtraPaymentInput(
                 "months",
                 "Se necesitan los seis meses del semestre, incluidos los que no tengan días de relación laboral.",
@@ -75,10 +75,14 @@ def calculate_semester_extra(
         expected = tuple(
             date(first.year, first.month + index, 1) for index in range(6)
         )
-        if tuple(item.month for item in months) != expected:
+        if tuple(
+            dict.fromkeys(item.month for item in months)
+        ) != expected or tuple(item.month for item in months) != tuple(
+            sorted(item.month for item in months)
+        ):
             raise InvalidExtraPaymentInput(
                 "months",
-                "Los meses deben ser consecutivos, únicos y estar ordenados dentro del mismo semestre.",
+                "Deben estar representados los seis meses en orden; un mes puede contener varios tramos.",
             )
         references = []
         for index, item in enumerate(months):
@@ -101,14 +105,16 @@ def calculate_semester_extra(
                 raise InvalidExtraPaymentInput(
                     f"months[{index}].{error.field}", str(error)
                 ) from error
-            if item.salary_days == 0 and (
-                item.base_salary != 0 or item.seniority != 0
+            references.append(reference)
+        for month in expected:
+            if (
+                sum(item.salary_days for item in months if item.month == month)
+                > 30
             ):
                 raise InvalidExtraPaymentInput(
-                    f"months[{index}].salary_days",
-                    "Un mes sin relación laboral debe tener base y antigüedad cero.",
+                    "salary_days",
+                    "Los tramos de un mes no pueden sumar más de 30 días salariales.",
                 )
-            references.append(reference)
         if len({item.payments_per_year for item in months}) != 1:
             raise InvalidExtraPaymentInput(
                 "payments_per_year",

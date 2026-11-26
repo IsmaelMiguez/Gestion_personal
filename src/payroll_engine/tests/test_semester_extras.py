@@ -150,7 +150,7 @@ class SemesterExtraTests(TestCase):
                     Decimal(0),
                 )
 
-    def test_partial_days_must_be_explicit_and_zero_days_cannot_hide_salary(
+    def test_partial_days_are_explicit_and_zero_weight_does_not_add_accrual(
         self,
     ):
         for days in (None, True, -1, 31, Decimal("16.5"), "16"):
@@ -166,8 +166,33 @@ class SemesterExtraTests(TestCase):
                 self.assertEqual(
                     raised.exception.field, "months[0].salary_days"
                 )
+        result = calculate_semester_extra(
+            (replace(self.months[0], salary_days=0), *self.months[1:]),
+            ROUND_HALF_UP,
+        )
+        self.assertEqual(result.amount, Decimal("2279.17"))
+        self.assertEqual(result.lines[0].accrued_amount, Decimal(0))
+
+    def test_multiple_references_in_one_month_use_their_own_weights(self):
+        first = replace(
+            self.months[0],
+            base_salary=Decimal(2000),
+            seniority=Decimal(0),
+            salary_days=15,
+        )
+        second = replace(first, base_salary=Decimal(3000))
+        later = tuple(
+            replace(item, base_salary=Decimal(3000), seniority=Decimal(0))
+            for item in self.months[1:]
+        )
+        result = calculate_semester_extra(
+            (first, second, *later), ROUND_HALF_UP
+        )
+        self.assertEqual(result.amount, Decimal("2916.67"))
+        self.assertEqual(len(result.lines), 7)
+        self.assertEqual(result.lines[0].accrued_amount, Decimal("166.67"))
+        self.assertEqual(result.lines[1].accrued_amount, Decimal("250.00"))
         with self.assertRaises(InvalidExtraPaymentInput):
             calculate_semester_extra(
-                (replace(self.months[0], salary_days=0), *self.months[1:]),
-                ROUND_HALF_UP,
+                (replace(first, salary_days=16), second, *later), ROUND_HALF_UP
             )

@@ -190,3 +190,43 @@ def monthly_contribution_days(
         min(employment_end or month_end, month_end)
         - max(employment_start, month_start)
     ).days
+
+
+def standard_month_salary_day_splits(
+    employment_start: date,
+    employment_end: date | None,
+    month_start: date,
+    boundaries: tuple[date, ...],
+) -> tuple[int, ...]:
+    """Partition the agreed salary days without counting day 31 twice."""
+    total = standard_month_salary_days(
+        employment_start, employment_end, month_start
+    )
+    month_end = date(
+        month_start.year + (month_start.month == 12),
+        month_start.month % 12 + 1,
+        1,
+    )
+    start = max(month_start, employment_start)
+    end = min(month_end, employment_end or month_end)
+    if (
+        not isinstance(boundaries, tuple)
+        or any(
+            type(boundary) is not date or not start < boundary < end
+            for boundary in boundaries
+        )
+        or tuple(sorted(set(boundaries))) != boundaries
+    ):
+        raise InvalidBaseSalaryInput(
+            "boundaries",
+            "Las fechas de cambio deben ser únicas, ordenadas e interiores al intervalo activo.",
+        )
+    counts = [
+        0,
+        *(
+            standard_month_salary_days(employment_start, boundary, month_start)
+            for boundary in boundaries
+        ),
+        total,
+    ]
+    return tuple(right - left for left, right in zip(counts, counts[1:]))

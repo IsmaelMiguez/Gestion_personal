@@ -15,6 +15,7 @@ from payroll_engine.base_salary import (
     base_salary_from_monthly,
     monthly_contribution_days,
     prorate_monthly_salary,
+    standard_month_salary_day_splits,
     standard_month_salary_days,
 )
 
@@ -233,3 +234,72 @@ class MonthlyContributionDayTests(TestCase):
                 self.assertEqual(
                     monthly_contribution_days(start, end, month), expected
                 )
+
+
+class StandardMonthDaySplitTests(TestCase):
+    def test_partition_conserves_thirty_days_in_february_and_day_31(self):
+        cases = (
+            (
+                date(2026, 1, 1),
+                None,
+                date(2026, 1, 1),
+                (date(2026, 1, 16),),
+                (15, 15),
+            ),
+            (
+                date(2026, 1, 1),
+                None,
+                date(2026, 1, 1),
+                (date(2026, 1, 31),),
+                (30, 0),
+            ),
+            (
+                date(2026, 2, 1),
+                None,
+                date(2026, 2, 1),
+                (date(2026, 2, 28),),
+                (27, 3),
+            ),
+            (
+                date(2028, 2, 1),
+                None,
+                date(2028, 2, 1),
+                (date(2028, 2, 29),),
+                (28, 2),
+            ),
+            (
+                date(2026, 2, 15),
+                None,
+                date(2026, 2, 1),
+                (date(2026, 2, 21),),
+                (6, 10),
+            ),
+        )
+        for start, end, month, boundaries, expected in cases:
+            with self.subTest(month=month, boundaries=boundaries):
+                self.assertEqual(
+                    standard_month_salary_day_splits(
+                        start, end, month, boundaries
+                    ),
+                    expected,
+                )
+                self.assertEqual(
+                    sum(expected),
+                    standard_month_salary_days(start, end, month),
+                )
+
+    def test_change_dates_must_be_unique_sorted_and_inside_the_active_period(
+        self,
+    ):
+        for boundaries in (
+            [date(2026, 1, 15)],
+            (date(2026, 1, 1),),
+            (date(2026, 2, 1),),
+            (date(2026, 1, 20), date(2026, 1, 10)),
+            (date(2026, 1, 15),) * 2,
+        ):
+            with self.subTest(boundaries=boundaries):
+                with self.assertRaises(InvalidBaseSalaryInput):
+                    standard_month_salary_day_splits(
+                        date(2026, 1, 1), None, date(2026, 1, 1), boundaries
+                    )

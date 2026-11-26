@@ -3,11 +3,11 @@
 from decimal import Decimal
 
 from payroll_engine.reconciliation import reconcile_ordinary_payroll
-from payroll_engine.rules_2026 import MAXIMUM_BASE, MONTHLY_MINIMUM_BASES
+from payroll_engine.rules_2026 import MAXIMUM_BASE
 
 from .payroll_columns import COLUMNS
 
-SOURCE = "Orden PJC/297/2026, artículos 1–4, 16, 17 y 33"
+SOURCE = "Orden PJC/297/2026, artículos 1–4, 16, 17, 33, 38 y 39"
 
 
 def value_cell(code, value, formula, operands, note):
@@ -95,11 +95,7 @@ def result_cells(result, condition):
 def contribution_cells(result, condition):
     cells = {}
     maximum = MAXIMUM_BASE * result.contribution_days / 30
-    minimum = (
-        MONTHLY_MINIMUM_BASES[condition.contribution_group - 1]
-        * result.contribution_days
-        / 30
-    )
+    minimum = result.minimum_common_base
     formula = "Estimación anual de ambas extras ÷ 12 (artículo 1)"
     operands = f"{result.estimated_annual_extra_amount} ÷ 12 = {result.extra_payment_accrual}"
     if result.annual_salary_days != 360 or result.contribution_days != 30:
@@ -243,7 +239,7 @@ def contribution_cells(result, condition):
     return cells
 
 
-def period_result_cells(result, condition, gross, salary_days):
+def period_result_cells(result, condition, gross, insurance_deductions):
     cells = contribution_cells(result, condition)
     cells["CB"] = value_cell(
         "CB",
@@ -270,19 +266,61 @@ def period_result_cells(result, condition, gross, salary_days):
         f"{gross} × {rate} ÷ 100",
         "Se aplica el porcentaje informado; no se calcula ni regulariza el tipo.",
     )
-    premiums = [
-        getattr(condition, name) for name in condition.money_fields[1:5]
-    ]
-    if (
-        salary_days == 30 and all(amount is not None for amount in premiums)
-    ) or all(amount == 0 for amount in premiums):
-        insurance = Decimal(sum(premiums)) / 100
-        for code in ("CA", "CG"):
-            cells[code] = value_cell(
-                code,
-                gross - result.employee_contributions - tax - insurance,
-                "Bruto − SS trabajador − IRPF − seguros conocidos del periodo",
-                f"{gross} − {result.employee_contributions} − {tax} − {insurance}",
-                "En mes completo se descuentan las primas mensuales; en mes incompleto este líquido solo se conoce si las cuatro primas son cero. No incluye finiquito ni abono separado de extras.",
-            )
+    if any(amount is None for amount in insurance_deductions):
+        return cells
+    insurance = sum(insurance_deductions, Decimal("0.00"))
+    net_before_insurance = gross - result.employee_contributions - tax
+    for code in ("CA", "CG"):
+        cells[code] = value_cell(
+            code,
+            net_before_insurance - insurance,
+            "Bruto − SS trabajador − IRPF − suma de seguros prorrateados",
+            f"{gross} − {result.employee_contributions} − {tax} = líquido previo {net_before_insurance}; "
+            f"{net_before_insurance} − ({' + '.join(str(amount) for amount in insurance_deductions)}) = {net_before_insurance - insurance}",
+            "Cada prima mensual se prorratea por días salariales / 30 y se redondea por separado. Se usan los mismos descuentos que muestran Q/R/S/T. No incluye finiquito ni abono separado de extras.",
+        )
     return cells
+
+
+def pending_cell(code, reason):
+    return {
+        "code": code,
+        "label": dict(COLUMNS)[code],
+        "value": "Pendiente",
+        "formula": "No se ha ejecutado este cálculo.",
+        "operands": "",
+        "note": reason,
+        "available": False,
+    }
+
+
+def report_result(
+    relationship, start, values, reasons, salary_days, requires_hours, segments
+):
+    pending_reason = (
+        " ".join(reasons)
+        or "Este concepto del Excel aún no está implementado o requiere reglas de incidencias, extras o INSS."
+    )
+    cells = [
+        values.get(code) or pending_cell(code, pending_reason)
+        for code, label in COLUMNS
+    ]
+    for cell in cells:
+        cell.update(
+            key=f"{relationship.pk}:{start.year}:{start.month}:{cell['code']}",
+            period=f"{start:%m/%Y}",
+            employee=str(relationship.employee),
+            company=str(relationship.company),
+        )
+        if segments:
+            cell["condition_segments"] = segments
+    return {
+        "company": relationship.company,
+        "employee": relationship.employee,
+        "relationship_id": relationship.pk,
+        "period": f"{start:%m/%Y}",
+        "salary_days": salary_days,
+        "requires_hours": requires_hours,
+        "cells": cells,
+        "issues": reasons,
+    }

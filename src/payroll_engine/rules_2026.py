@@ -36,3 +36,11 @@ SOLIDARITY_BANDS = (
         Decimal("1.22"),
     ),
 )
+
+
+# Orden PJC/297/2026, articles 38–39; monthly groups 1–7.
+HOURLY_MINIMUM_BASES = tuple(
+    Decimal(value)
+    for value in ("11.98", "9.94", "8.65", "8.58", "8.58", "8.58", "8.58")
+)
+MINIMUM_PROFESSIONAL_HOURLY_BASE = Decimal("8.58")

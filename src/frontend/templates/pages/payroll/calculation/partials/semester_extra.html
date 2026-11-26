@@ -15,7 +15,7 @@
     <div class="table-responsive"><table class="table table-sm table-striped align-middle">
       <caption class="visually-hidden">Detalle del devengo por mes</caption>
       <thead><tr><th scope="col">Mes</th><th scope="col">Pagas</th><th scope="col">Días / 30</th><th scope="col">Base mensual de referencia (€)</th><th scope="col">Antigüedad mensual de referencia (€)</th><th scope="col">Devengo mensual (€)</th></tr></thead>
-      <tbody>{% for row in extra.rows %}<tr><th scope="row">{{ row.month|date:"m/Y" }}</th>
+      <tbody>{% for row in extra.rows %}<tr><th scope="row">{{ row.month|date:"m/Y" }}{% if row.start %}<span class="d-block small text-body-secondary">{{ row.start|date:"d/m" }}–{{ row.last_day|date:"d/m" }}</span>{% endif %}</th>
         {% if row.issue %}<td colspan="5" class="text-warning-emphasis">{{ row.issue }}</td>{% else %}
         <td>{{ row.payments }}</td><td>{{ row.salary_days }}</td><td>{{ row.base_salary|floatformat:"2g" }}</td><td>{{ row.seniority|floatformat:"2g" }}</td><td>{% if extra.result %}{{ row.accrued|floatformat:"2g" }}{% else %}Pendiente{% endif %}</td>{% endif %}
       </tr>{% endfor %}</tbody>
@@ -33,7 +33,7 @@
         <p class="small mb-0">Bruto − IRPF = líquido. No se repiten seguros, complemento fijo ni cuotas SS: la cotización de extras se calcula en las mensualidades ordinarias. El porcentaje es el informado para julio/diciembre, no el de los meses de devengo. Esta simulación no acredita que se haya pagado.</p>
       </section>
     {% elif extra.payment_issue %}<div class="alert alert-warning mt-3">Abono pendiente: {{ extra.payment_issue }} El devengo bruto conocido se conserva.</div>{% endif %}
-    <p class="small text-body-secondary mb-0">Solo sueldo base y antigüedad, usando las condiciones de cada mes. Consulta sin incidencias declaradas; no registra pagos. Un cambio entre 12/14 pagas, huecos o cambios de condiciones dentro del intervalo activo, o datos necesarios sin informar, dejan el total pendiente. Las altas y bajas usan los días salariales de cada mes; el bruto devengado no equivale a un finiquito ni valida su cotización.</p>
+    <p class="small text-body-secondary mb-0">Solo sueldo base y antigüedad, usando las condiciones de cada mes. Consulta sin incidencias declaradas; no registra pagos. Un cambio entre 12/14 pagas, huecos o solapamientos de condiciones dentro del intervalo activo, o datos necesarios sin informar, dejan el total pendiente. Las altas y bajas usan los días salariales de cada mes; el bruto devengado no equivale a un finiquito ni valida su cotización.</p>
   </div>
 </article>
 {% endlanguage %}

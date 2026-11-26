@@ -9,11 +9,30 @@
       {% if detail.operands %}<dt>Valores utilizados</dt><dd class="font-monospace text-break">{{ detail.operands }}</dd>{% endif %}
       <dt>Regla y observaciones</dt><dd>{{ detail.note }}</dd>
       <dt>Política de redondeo seleccionada</dt><dd>{{ detail.rounding }} · importes a céntimos cuando corresponda</dd></dl>
+      {% if detail.condition_segments %}
+        <section class="mb-3" aria-label="Desglose por tramos de condiciones">
+          <h3 class="h5">Tramos de condiciones del mes</h3>
+          <p class="small text-body-secondary">Cada importe se calcula con las condiciones vigentes en sus fechas. Los totales suman los importes redondeados de los tramos; el máximo de cotización y la solidaridad se aplican al mes una sola vez.</p>
+          <div class="table-responsive"><table class="table table-sm table-striped table-bordered">
+            <thead><tr><th>Desde</th><th>Hasta incluido</th><th>Días salariales</th><th>Días cotizados</th><th>Base mensual de referencia</th><th>Base devengada</th><th>Antigüedad</th><th>Complemento</th><th>Seg. trabajador exento</th><th>Seg. trabajador sujeto</th><th>Seg. familia exento</th><th>Seg. familia sujeto</th><th>Bruto</th><th>IRPF (%)</th></tr></thead>
+            <tbody>{% for segment in detail.condition_segments %}<tr>
+              <td>{{ segment.start|date:"d/m/Y" }}</td><td>{{ segment.last_day|date:"d/m/Y" }}</td><td>{{ segment.salary_days }}</td><td>{{ segment.contribution_days }}</td>
+              <td>{{ segment.salary.ordinary_payment_amount|floatformat:"2g"|default:"Pendiente" }}</td>
+              <td>{{ segment.values.O|floatformat:"2g"|default:"Pendiente" }}</td><td>{{ segment.values.P|floatformat:"2g"|default:"Pendiente" }}</td><td>{{ segment.values.U|floatformat:"2g"|default:"Pendiente" }}</td>
+              <td>{{ segment.values.Q|floatformat:"2g"|default:"Pendiente" }}</td><td>{{ segment.values.R|floatformat:"2g"|default:"Pendiente" }}</td><td>{{ segment.values.S|floatformat:"2g"|default:"Pendiente" }}</td><td>{{ segment.values.T|floatformat:"2g"|default:"Pendiente" }}</td>
+              <td>{{ segment.values.W|floatformat:"2g"|default:"Pendiente" }}</td><td>{{ segment.withholding_rate|floatformat:"2g"|default:"Pendiente" }}</td>
+            </tr>{% endfor %}</tbody>
+          </table></div>
+        </section>
+      {% endif %}
       {% if detail.contribution_period %}
         <section class="border rounded-3 bg-body-tertiary p-3 mb-3" aria-label="Días del periodo y cotización">
           <h3 class="h5">Días salariales y cotizados</h3>
           <dl class="row mb-0"><dt class="col-sm-8">Días salariales (mes estándar)</dt><dd class="col-sm-4">{{ detail.contribution_period.salary_days }}</dd>
           <dt class="col-sm-8">Días cotizados (TGSS)</dt><dd class="col-sm-4">{{ detail.contribution_period.contribution_days }}</dd>
+          {% if detail.contribution_period.worked_hours %}<dt class="col-sm-8">Horas ordinarias introducidas</dt><dd class="col-sm-4">{{ detail.contribution_period.worked_hours }}</dd>
+          <dt class="col-sm-8">Mínimo común por horas (€)</dt><dd class="col-sm-4">{{ detail.contribution_period.minimum_common_base|floatformat:"2g" }}</dd>
+          <dt class="col-sm-8">Mínimo profesional por horas (€)</dt><dd class="col-sm-4">{{ detail.contribution_period.minimum_professional_base|floatformat:"2g" }}</dd>{% endif %}
           <dt class="col-sm-8">Días salariales cubiertos en la estimación anual</dt><dd class="col-sm-4">{{ detail.contribution_period.annual_salary_days }}</dd></dl>
           <p class="small mb-0">En meses completos la cotización mensual se ajusta a 30 días. En altas/bajas dentro del mes se usan días naturales de alta. La regla salarial acordada de febrero no altera este cómputo.</p>
         </section>
