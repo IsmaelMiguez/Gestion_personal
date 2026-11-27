@@ -10,6 +10,7 @@
         <p class="text-body-secondary">El empleado y el contrato se conservan. Los periodos vecinos no se ampliarán automáticamente; puede quedar un intervalo sin condiciones.</p>
       {% else %}
         <p>Se eliminará este empleado junto con <strong>{{ relationship_count }} contrato{{ relationship_count|pluralize:"s" }}</strong> y <strong>{{ condition_count }} periodo{{ condition_count|pluralize:"s" }} de condiciones</strong>.</p>
+        {% if ncm_count %}<p>También se eliminarán sus <strong>{{ ncm_count }} periodo{{ ncm_count|pluralize:"s" }} NCM</strong>.</p>{% endif %}
         <p class="text-body-secondary">Las empresas y los demás empleados se conservan.</p>
       {% endif %}
       <div class="alert alert-warning">Esta eliminación es permanente.</div>

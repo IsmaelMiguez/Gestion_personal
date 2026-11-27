@@ -53,12 +53,13 @@ def payroll_report(request):
             )
             .select_related("company", "employee")
             .prefetch_related(
+                "ncm_periods",
                 Prefetch(
                     "conditions",
                     queryset=EmploymentCondition.objects.order_by(
                         "valid_from"
                     ),
-                )
+                ),
             )
             .order_by(
                 "company__name", "employee__last_name", "employee_id", "pk"

@@ -20,6 +20,7 @@ from payroll_engine.ordinary_payroll import (
 )
 
 from .payroll_extras import extra_reference_cell
+from .payroll_ncm import ncm_report_row
 from .payroll_report_values import (
     pending_cell as _pending,
 )
@@ -104,6 +105,9 @@ def report_row(
     with localcontext(Context(prec=28, rounding=rounding)):
         start = date(year, month, 1)
         end = date(year + (month == 12), month % 12 + 1, 1)
+        ncm_row = ncm_report_row(relationship, start, end, rounding)
+        if ncm_row is not None:
+            return ncm_row
         salary_days = standard_month_salary_days(
             relationship.start_date, relationship.end_date, start
         )

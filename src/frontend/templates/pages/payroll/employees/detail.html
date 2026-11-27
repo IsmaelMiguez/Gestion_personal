@@ -43,6 +43,22 @@
         <div class="col-md-4"><div class="bg-white border rounded-3 p-3 h-100"><p class="text-body-secondary small mb-1">Antigüedad reconocida</p><p class="fw-semibold mb-0">{{ contract.relationship.seniority_date|date:"d/m/Y" }}</p></div></div>
       </div>
       <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+        <h4 class="h6 text-body-secondary mb-0">Nacimiento y cuidado del menor</h4>
+        <a class="btn btn-outline-primary btn-sm" href="{% url 'employees:ncm-add' employee.pk contract.relationship.pk %}">Registrar periodo NCM</a>
+      </div>
+      {% for period in contract.relationship.ncm_periods.all %}
+        <div class="border border-info-subtle bg-info-subtle rounded-3 p-3 mb-3">
+          <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+            <p class="fw-semibold mb-0">{{ period.start_date|date:"d/m/Y" }} — {{ period.end_date|date:"d/m/Y" }} (fin excluido)</p>
+            <div class="d-flex gap-2">
+              <a class="btn btn-outline-primary btn-sm" href="{% url 'employees:ncm-edit' employee.pk period.pk %}">Editar descanso</a>
+              <a class="btn btn-outline-danger btn-sm" href="{% url 'employees:ncm-delete' employee.pk period.pk %}">Eliminar descanso</a>
+            </div>
+          </div>
+          <p class="small mb-0 mt-2">Descanso: {{ period.rest_percentage }} % de su jornada contratada · BR diaria: {{ period.recognized_daily_base }} € antes del descanso.</p>
+        </div>
+      {% empty %}<p class="small text-body-secondary">Sin periodos NCM registrados.</p>{% endfor %}
+      <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3 mt-4">
         <h4 class="h6 text-body-secondary mb-0">Histórico de condiciones</h4>
         <a class="btn btn-outline-primary btn-sm" href="{% url 'employees:condition-add' employee.pk contract.relationship.pk %}">Añadir condiciones</a>
       </div>

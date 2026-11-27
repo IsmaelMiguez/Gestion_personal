@@ -106,7 +106,7 @@ class SemesterExtraReportTests(TestCase):
         self.condition.valid_until = None
         self.condition.salary_amount_cents = 240000
         self.condition.save()
-        with self.assertNumQueries(1):
+        with self.assertNumQueries(2):
             report = semester_extra(
                 self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 7, 1)
             )
@@ -238,7 +238,7 @@ class SemesterExtraReportTests(TestCase):
         self.condition.valid_from = date(2026, 2, 15)
         self.condition.fixed_supplement_cents = 20000
         self.condition.save()
-        with self.assertNumQueries(1):
+        with self.assertNumQueries(2):
             report = semester_extra(
                 self.relationship, 2026, 1, ROUND_HALF_UP, date(2026, 8, 1)
             )

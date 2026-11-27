@@ -6,8 +6,9 @@ from .models import (
     Employee,
     EmploymentCondition,
     EmploymentRelationship,
+    NcmPeriod,
 )
-from .services import update_record
+from .services import save_ncm_period, update_record
 
 
 class ValidatedAdmin(admin.ModelAdmin):
@@ -39,6 +40,20 @@ class CompanyAdmin(ValidatedAdmin):
 @admin.register(EmploymentRelationship)
 class EmploymentRelationshipAdmin(ValidatedAdmin):
     list_display = ("employee", "company", "start_date", "end_date")
+
+
+@admin.register(NcmPeriod)
+class NcmPeriodAdmin(ValidatedAdmin):
+    list_display = (
+        "employment_relationship",
+        "start_date",
+        "end_date",
+        "rest_percentage",
+        "recognized_daily_base",
+    )
+
+    def save_model(self, request, obj, form, change):
+        save_ncm_period(obj)
 
 
 @admin.register(EmploymentCondition)

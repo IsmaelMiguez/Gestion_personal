@@ -81,6 +81,20 @@ class EmploymentRelationship(models.Model):
     def clean(self):
         super().clean()
         if self.pk and self.start_date:
+            periods = self.ncm_periods.all()
+            if periods.filter(start_date__lt=self.start_date).exists():
+                raise ValidationError(
+                    {
+                        "start_date": "Existen periodos NCM anteriores al inicio."
+                    }
+                )
+            if (
+                self.end_date
+                and periods.filter(end_date__gt=self.end_date).exists()
+            ):
+                raise ValidationError(
+                    {"end_date": "Existen periodos NCM fuera de la relación."}
+                )
             conditions = self.conditions.all()
             if conditions.filter(valid_from__lt=self.start_date).exists():
                 raise ValidationError(
@@ -320,3 +334,95 @@ class EmploymentCondition(models.Model):
 
     def __str__(self):
         return f"{self.employment_relationship} · {self.valid_from}"
+
+
+class NcmPeriod(models.Model):
+    """Record an authorized NCM interval without changing contract conditions."""
+
+    employment_relationship = models.ForeignKey(
+        EmploymentRelationship,
+        on_delete=models.PROTECT,
+        related_name="ncm_periods",
+    )
+    start_date = models.DateField("inicio del descanso")
+    end_date = models.DateField(
+        "fin del descanso (excluido)",
+        help_text="Primer día que ya no pertenece a este periodo NCM.",
+    )
+    rest_percentage = models.DecimalField(
+        "descanso sobre la jornada contratada (%)",
+        max_digits=5,
+        decimal_places=2,
+        validators=[
+            MinValueValidator(Decimal("0.01")),
+            MaxValueValidator(100),
+        ],
+        help_text="Con contrato al 50 % y descanso al 50 %, se trabaja el 25 % de una jornada completa.",
+    )
+    recognized_daily_base = models.DecimalField(
+        "base reguladora diaria reconocida (€)",
+        max_digits=14,
+        decimal_places=4,
+        validators=[
+            MinValueValidator(Decimal("0.0001")),
+            MaxValueValidator(Decimal("9999999999.99")),
+        ],
+        help_text="BR de la jornada habitual antes de aplicar el descanso NCM; no es el sueldo diario ni la prestación ya reducida.",
+    )
+
+    class Meta:
+        verbose_name = "periodo de nacimiento y cuidado del menor"
+        verbose_name_plural = "periodos de nacimiento y cuidado del menor"
+        ordering = ("start_date", "pk")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(end_date__gt=models.F("start_date")),
+                name="ncm_positive_interval",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(rest_percentage__gt=0)
+                & models.Q(rest_percentage__lte=100),
+                name="ncm_valid_rest_percentage",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(recognized_daily_base__gt=0)
+                & models.Q(
+                    recognized_daily_base__lte=Decimal("9999999999.99")
+                ),
+                name="ncm_valid_daily_base",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if (
+            not self.employment_relationship_id
+            or not self.start_date
+            or not self.end_date
+        ):
+            return
+        relationship = EmploymentRelationship.objects.filter(
+            pk=self.employment_relationship_id
+        ).first()
+        if relationship is None:
+            return
+        errors = {}
+        if self.end_date <= self.start_date:
+            errors["end_date"] = "El fin debe ser posterior al inicio."
+        if self.start_date < relationship.start_date:
+            errors["start_date"] = "Anterior al inicio de la relación laboral."
+        if relationship.end_date and self.end_date > relationship.end_date:
+            errors["end_date"] = "Debe quedar dentro de la relación laboral."
+        if (
+            relationship.ncm_periods.exclude(pk=self.pk)
+            .filter(start_date__lt=self.end_date, end_date__gt=self.start_date)
+            .exists()
+        ):
+            errors["start_date"] = (
+                "El descanso se solapa con otro periodo NCM."
+            )
+        if errors:
+            raise ValidationError(errors)
+
+    def __str__(self):
+        return f"{self.employment_relationship} · NCM {self.start_date} — {self.end_date} (fin excluido)"

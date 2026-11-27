@@ -9,7 +9,7 @@ from django_htmx.http import HttpResponseClientRedirect
 from frontend.pages.access import staff_required
 
 from .forms import DeletionConfirmationForm
-from .models import Employee, EmploymentCondition
+from .models import Employee, EmploymentCondition, NcmPeriod
 from .services import delete_condition, delete_employee
 
 
@@ -52,6 +52,9 @@ def employee_delete(request, pk):
             "heading": "Eliminar empleado",
             "relationship_count": employee.employment_relationships.count(),
             "condition_count": EmploymentCondition.objects.filter(
+                employment_relationship__employee=employee
+            ).count(),
+            "ncm_count": NcmPeriod.objects.filter(
                 employment_relationship__employee=employee
             ).count(),
         },

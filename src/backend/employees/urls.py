@@ -4,6 +4,7 @@ from . import (
     company_views,
     condition_views,
     deletion_views,
+    ncm_views,
     payroll_report_views,
     payroll_views,
     views,
@@ -12,6 +13,21 @@ from . import (
 app_name = "employees"
 
 urlpatterns = [
+    path(
+        "employees/<int:employee_pk>/relationships/<int:relationship_pk>/ncm/new/",
+        ncm_views.ncm_add,
+        name="ncm-add",
+    ),
+    path(
+        "employees/<int:employee_pk>/ncm/<int:pk>/edit/",
+        ncm_views.ncm_edit,
+        name="ncm-edit",
+    ),
+    path(
+        "employees/<int:employee_pk>/ncm/<int:pk>/delete/",
+        ncm_views.ncm_delete,
+        name="ncm-delete",
+    ),
     path("", views.home, name="home"),
     path(
         "companies/new/",

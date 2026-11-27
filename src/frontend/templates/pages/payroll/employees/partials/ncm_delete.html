@@ -1,0 +1,13 @@
+<section id="ncm-delete-panel" class="card shadow-sm border-danger-subtle rounded-4">
+  <div class="card-header bg-danger-subtle p-4"><h1 class="h3">Eliminar periodo NCM</h1><p class="mb-0">{{ employee }} · {{ period.employment_relationship.company }}</p></div>
+  <div class="card-body p-4">
+    <p>Se eliminará el descanso del {{ period.start_date|date:"d/m/Y" }} al {{ period.end_date|date:"d/m/Y" }} (fin excluido). Los datos del contrato se conservan.</p>
+    <form method="post" action="{{ request.path }}" hx-post="{{ request.path }}" hx-target="#ncm-delete-panel" hx-swap="outerHTML" hx-sync="this:drop" novalidate>
+      {% csrf_token %}
+      <div class="form-check mb-3">{{ form.confirm }}<label class="form-check-label" for="{{ form.confirm.id_for_label }}">{{ form.confirm.label }}</label></div>
+      {% for error in form.confirm.errors %}<p class="text-danger" role="alert">{{ error }}</p>{% endfor %}
+      <button class="btn btn-danger" type="submit">Eliminar periodo NCM</button>
+      <a class="btn btn-outline-secondary" href="{% url 'employees:detail' employee.pk %}">Cancelar</a>
+    </form>
+  </div>
+</section>

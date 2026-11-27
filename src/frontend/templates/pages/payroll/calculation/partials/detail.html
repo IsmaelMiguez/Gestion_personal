@@ -9,6 +9,20 @@
       {% if detail.operands %}<dt>Valores utilizados</dt><dd class="font-monospace text-break">{{ detail.operands }}</dd>{% endif %}
       <dt>Regla y observaciones</dt><dd>{{ detail.note }}</dd>
       <dt>Política de redondeo seleccionada</dt><dd>{{ detail.rounding }} · importes a céntimos cuando corresponda</dd></dl>
+      {% if detail.ncm_segments %}
+        <section class="mb-3" aria-label="Desglose de nacimiento y cuidado del menor">
+          <h3 class="h5">Periodos NCM del mes</h3>
+          <p class="small text-body-secondary">Se cuentan los días naturales comprendidos en el descanso registrado y en este mes. La BR diaria se informa antes de aplicar el descanso y ya corresponde al contrato habitual. La prestación mostrada es bruta.</p>
+          <div class="table-responsive"><table class="table table-sm table-striped table-bordered">
+            <thead><tr><th>Desde</th><th>Hasta incluido</th><th>Jornada contratada (%)</th><th>Descanso (%)</th><th>Jornada efectiva (%)</th><th>Días NCM</th><th>BR diaria (€)</th><th>Prestación bruta (€)</th></tr></thead>
+            <tbody>{% for segment in detail.ncm_segments %}<tr>
+              <td>{{ segment.start|date:"d/m/Y" }}</td><td>{{ segment.last_day|date:"d/m/Y" }}</td>
+              <td>{{ segment.result.contracted_percentage }}</td><td>{{ segment.result.rest_percentage }}</td><td>{{ segment.result.effective_working_percentage }}</td>
+              <td>{{ segment.result.benefit_days }}</td><td>{{ segment.result.recognized_daily_base|floatformat:4 }}</td><td>{{ segment.result.gross_benefit|floatformat:"2g" }}</td>
+            </tr>{% endfor %}</tbody>
+          </table></div>
+        </section>
+      {% endif %}
       {% if detail.condition_segments %}
         <section class="mb-3" aria-label="Desglose por tramos de condiciones">
           <h3 class="h5">Tramos de condiciones del mes</h3>

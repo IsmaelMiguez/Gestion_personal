@@ -3,7 +3,7 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from .models import EmploymentCondition
+from .models import EmploymentCondition, EmploymentRelationship, NcmPeriod
 
 
 def save_record(instance):
@@ -82,6 +82,9 @@ def delete_employee(employee):
     EmploymentCondition.objects.filter(
         employment_relationship__in=relationships
     ).delete()
+    NcmPeriod.objects.filter(
+        employment_relationship__in=relationships
+    ).delete()
     relationships.delete()
     employee.delete()
 
@@ -93,3 +96,12 @@ def add_conditions(relationship, condition):
     )
     condition.employment_relationship = relationship
     return save_record(condition)
+
+
+@transaction.atomic
+def save_ncm_period(period):
+    """Serialize NCM writes on the contract before checking overlaps."""
+    EmploymentRelationship.objects.select_for_update().get(
+        pk=period.employment_relationship_id
+    )
+    return save_record(period)

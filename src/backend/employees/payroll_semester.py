@@ -22,12 +22,18 @@ from payroll_engine.seniority import (
     calculate_monthly_seniority,
 )
 
+from .payroll_ncm import NCM_EXTRAS_PENDING, ncm_periods_in_interval
 from .payroll_scope import condition_segments, monthly_contract_issues
 
 
-def _payment_cash(relationship, conditions, result, rounding):
+def _payment_cash(relationship, conditions, ncm_periods, result, rounding):
     start = result.payment_month
     end = date(start.year + (start.month == 12), start.month % 12 + 1, 1)
+    if ncm_periods_in_interval(ncm_periods, start, end):
+        return (
+            None,
+            "Hay NCM en el mes de abono: su tratamiento en el pago de extras está pendiente.",
+        )
     if start.year != 2026:
         return (
             None,
@@ -141,11 +147,17 @@ def _segment_input(relationship, segment, month, rounding):
 
 def semester_extra(relationship, year, first_month, rounding, as_of_date):
     conditions = list(relationship.conditions.all())
+    ncm_periods = list(relationship.ncm_periods.all())
     rows = []
     inputs = []
     issues = []
     for number in range(first_month, first_month + 6):
         month = date(year, number, 1)
+        next_month = date(year + (number == 12), number % 12 + 1, 1)
+        if ncm_periods_in_interval(ncm_periods, month, next_month):
+            issues.append(f"{month:%m/%Y}: {NCM_EXTRAS_PENDING}")
+            rows.append({"month": month, "issue": NCM_EXTRAS_PENDING})
+            continue
         try:
             items = _month_inputs(relationship, conditions, month, rounding)
         except (
@@ -185,7 +197,7 @@ def semester_extra(relationship, year, first_month, rounding, as_of_date):
     payment_issue = ""
     if result is not None and result.payments_per_year == 14:
         payment, payment_issue = _payment_cash(
-            relationship, conditions, result, rounding
+            relationship, conditions, ncm_periods, result, rounding
         )
     return {
         "company": relationship.company,

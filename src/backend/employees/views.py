@@ -93,12 +93,13 @@ def employee_detail(request, pk):
     relationships = (
         EmploymentRelationship.objects.select_related("company")
         .prefetch_related(
+            "ncm_periods",
             Prefetch(
                 "conditions",
                 queryset=EmploymentCondition.objects.order_by(
                     "-valid_from", "-pk"
                 ),
-            )
+            ),
         )
         .order_by("-start_date", "-pk")
     )

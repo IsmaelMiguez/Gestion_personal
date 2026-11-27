@@ -1,0 +1,27 @@
+<section id="ncm-panel" aria-labelledby="ncm-title">
+  <a class="btn btn-light border btn-sm mb-4" href="{% url 'employees:detail' employee.pk %}">&larr; Volver a la ficha</a>
+  <div class="card shadow-sm rounded-4 overflow-hidden">
+    <div class="card-header bg-primary-subtle p-4">
+      <p class="small mb-1">{{ employee }} · {{ relationship.company }}</p>
+      <h1 id="ncm-title" class="h3 mb-2">{% if period.pk %}Editar{% else %}Registrar{% endif %} periodo de nacimiento y cuidado del menor</h1>
+      <p class="mb-0">Registra las fechas y el descanso autorizados. La jornada del contrato se mantiene; este porcentaje de descanso se aplica sobre ella.</p>
+    </div>
+    <div class="card-body p-4">
+      <div class="alert alert-info">Este paso calcula la prestación bruta del INSS. El salario de empresa, las cuotas, el líquido y el efecto sobre las extras durante NCM siguen pendientes. La aplicación no comprueba el derecho ni la duración legal del permiso.</div>
+      <form method="post" action="{{ request.path }}" hx-post="{{ request.path }}" hx-target="#ncm-panel" hx-swap="outerHTML" hx-sync="this:drop" hx-disabled-elt="find button[type='submit']" novalidate>
+        {% csrf_token %}
+        {% for error in form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endfor %}
+        <div class="row g-3 mb-4">
+          {% for field in form %}<div class="col-md-6">
+            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% if field.help_text %}<div class="form-text" id="{{ field.auto_id }}_helptext">{{ field.help_text }}</div>{% endif %}
+            {% if field.errors %}<div id="{{ field.auto_id }}_error" class="text-danger small" role="alert">{% for error in field.errors %}<div>{{ error }}</div>{% endfor %}</div>{% endif %}
+          </div>{% endfor %}
+        </div>
+        <button class="btn btn-primary" type="submit">Guardar periodo NCM</button>
+        <a class="btn btn-outline-secondary" href="{% url 'employees:detail' employee.pk %}">Cancelar</a>
+      </form>
+    </div>
+  </div>
+</section>

@@ -7,6 +7,7 @@ from .models import (
     Employee,
     EmploymentCondition,
     EmploymentRelationship,
+    NcmPeriod,
 )
 
 
@@ -180,3 +181,14 @@ class DeletionConfirmationForm(BootstrapFormMixin, forms.Form):
         label="Confirmo que quiero eliminar los datos indicados.",
         required=True,
     )
+
+
+class NcmPeriodForm(BootstrapFormMixin, forms.ModelForm):
+    class Meta:
+        model = NcmPeriod
+        fields = (
+            "start_date",
+            "end_date",
+            "rest_percentage",
+            "recognized_daily_base",
+        )

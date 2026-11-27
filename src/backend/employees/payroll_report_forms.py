@@ -34,7 +34,7 @@ class PayrollReportForm(BootstrapFormMixin, forms.Form):
     )
     rounding = OrdinaryPayrollForm.base_fields["rounding"]
     base_only = forms.BooleanField(
-        label="Confirmo que los periodos y el ejercicio anual usado para estimar las extras no tienen incidencias, bonus, "
+        label="Confirmo que, salvo los periodos NCM registrados, los periodos y el ejercicio anual usado para estimar las extras no tienen otras incidencias, bonus, "
         "pluriempleo, bonificaciones, horas complementarias/extraordinarias, trabajo concentrado ni cotizaciones especiales.",
         help_text="Los conceptos adicionales registrados se comprobarán igualmente.",
     )
